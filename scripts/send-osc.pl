@@ -75,35 +75,47 @@ my $tick = 0;
 my $ticks_in_bar = @$sequencer / $tracks / $beats;
 say "You have defined $ticks_in_bar ticks";
 
+$| = 1;
+
+# Periodically swap $sequencer for the next bar/ set of 16 beats / whatever
+
+# We should be able to pause / restart / resume / resync the code
+# For resync, we need to keep track of the start time or increase our tick counter
+
+my $play_state = 'paused';
+
+sub play_sounds {
+	my $loc = loc($tick, 0) % @$sequencer;
+
+	# Consider calculating the tick from the start of the
+	# playtime instead of blindly increasing it?!
+	$tick = ($tick+1)%$ticks_in_bar;
+	print sprintf "%d / %d / %d\r", $tick, $loc, scalar @$sequencer;
+	for my $s ($loc..$loc+$tracks-1) {
+		my $n = $sequencer->[$s];
+		if( $n ) {
+			my $r = ref $n;
+			if( $r ) {
+				if( $r eq 'CODE' ) {
+					# Can we pass any meaningful parameters here?
+					# Like maybe the current tick?!
+					send_osc( $udp, $n->($tick) );
+				} elsif( $r eq 'ARRAY' ) {
+					send_osc( $udp, @$n );
+				}
+			} else {
+				send_msg( $udp, $n );
+			}
+		}
+	}
+}
+
+
 my $timer = IO::Async::Timer::Periodic->new(
     reschedule => 'skip',
     first_interval => 0,
     interval => 60/$bpm/$beats/$ticks,
-    on_tick => sub {
-        my $loc = loc($tick, 0) % @$sequencer;
-
-        # Consider calculating the tick from the start of the
-        # playtime instead of blindly increasing it?!
-        $tick = ($tick+1)%$ticks_in_bar;
-        say sprintf '%d / %d / %d', $tick, $loc, scalar @$sequencer;
-        for my $s ($loc..$loc+$tracks-1) {
-            my $n = $sequencer->[$s];
-            if( $n ) {
-                my $r = ref $n;
-                if( $r ) {
-                    if( $r eq 'CODE' ) {
-                        # Can we pass any meaningful parameters here?
-                        # Like maybe the current tick?!
-                        send_osc( $udp, $n->($tick) );
-                    } elsif( $r eq 'ARRAY' ) {
-                        send_osc( $udp, @$n );
-                    }
-                } else {
-                    send_msg( $udp, $n );
-                }
-            }
-        }
-    },
+    on_tick => \&play_sounds,
 );
 
 # send_osc "/loader/require", "tempfile" ?!

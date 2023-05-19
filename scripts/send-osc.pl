@@ -45,9 +45,9 @@ sub send_osc_msg( $socket, $data ) {
 my $loop = IO::Async::Loop->new();
 my $udp = new_socket($loop, '127.0.0.1', 4560);
 
-my $bpm = 120;
-my $beats = 4; # 4/4
-my $ticks = 4; # ticks per beat, means 1/16th notes
+my $bpm    = 120;
+my $beats  = 4; # 4/4
+my $ticks  = 4; # ticks per beat, means 1/16th notes
 my $tracks = 4; # so far...
 
 sub loc($tick, $track) {
@@ -60,83 +60,65 @@ sub beat($beat, $track) {
 
 my $sequencer = [];
 
-# We don't only want full programmatic stuff, we also want
-# to specify stuff via patterns, just like in any sequencer.
-# Most likely we want to parse (drum) patterns like:
-#
-# HH|x-x-x-x-x-x-x-x-||
-#  S|--------o-------||
-#  B|o---------------||
-#    1 + 2 + 3 + 4 +
-
 for my $beat (0..15) {
     $sequencer->[beat($beat*4+2,0)] = [
     # Maybe we should pre-cook the OSC message even, to take
     # load out of the output loop
-    "/trigger/tb303" => 'iiffi',
+    "/trigger/tb303x" => 'iiffi',
         #(70+int(rand(12)), 0.125, 60+int(rand(50)), 0.8, 0)
         (40+int(rand(24)), 130, 0.1, 0.8+rand(0.15), 0)
     ];
-	# 1/4 bassdrum
-	#if( $beat % 4 == 0 ) {
-	#	$sequencer->[beat($beat*4,1)] =
-	#		$osc->message("/trigger/bd", 'i' => 5);
-	#	;
-	#}
-	## 1/8 hi-hat
-    #$sequencer->[beat($beat*4,2)] =
-    #    $osc->message("/trigger/hh", 'i' => 1);
-    #;
-    #$sequencer->[beat($beat*4+2,2)] =
-    #    $osc->message("/trigger/hh", 'i' => 1);
-    #;
 }
 
-# we expect each char to be a 16th note
-sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1 ) {
+# we expect each char to be a 32th note (?!)
+sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks_per_note=undef) {
 	$pattern =~ m!^\s*\w+\s*\|((?:[\w\-]{16})+)\|+!
 	    or croak "Invalid pattern '$pattern'";
+	$ticks_per_note //= length($1) / 4;
 	my $p = $1;
-	while( length $p < 64 ) {
+	while( length $p < 64 * $ticks_per_note) {
 		$p .= $1;
 	}
+		
 	my @beats = split //, $p;
 	my $ofs = 0;
 
 	while( $ofs < @beats ) {
 		if( $beats[ $ofs ] ne '-' ) {
-			$sequencer->[beat($ofs,$track)] =
+			$sequencer->[loc($ofs*$ticks_per_note,$track)] =
 			    $osc->message($osc_message, 'f' => $vol);
 			;
 		}
 		$ofs++;
 	}
+	say loc($ofs*$ticks_per_note,$track);
 }
 
 # 64 16th notes
 # Half Drop
-#                                     1   2   3   4   1   2   3   4
+#                                      1       2       3       4       1       2       3       4   
 #parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
 #parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
 #parse_drum_pattern($sequencer, 3, ' B|o---------------o---------------o---------------o---------------||', '/trigger/bd');
 
 # One Drop
-#                                     1   2   3   4   1   2   3   4
-parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
-parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
-parse_drum_pattern($sequencer, 4, ' B|o-------o-------o-------o-------o-------o-------o-------o-------||', '/trigger/bd');
+#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
+#parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
+#parse_drum_pattern($sequencer, 4, ' B|o-------o-------o-------o-------o-------o-------o-------o-------||', '/trigger/bd');
 
 
 # Reggaeton
-# Is this too slow?!
-#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
-#parse_drum_pattern($sequencer, 3, ' S|----------------------o-----o-------------------------o-----o---||', '/trigger/sn');
-#parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------o-------o-------o-------o-------||', '/trigger/bd');
+parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh',0.25,2);
+parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
+parse_drum_pattern($sequencer, 3, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 
 
 # "Expand" the array to the full length
 my $last = beat(16*4,0)-1;
 $sequencer->[$last]= undef;
+
+say $last;
+say scalar @$sequencer;
 
 my $tick = 0;
 my $ticks_in_bar = @$sequencer / $tracks;

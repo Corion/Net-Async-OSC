@@ -93,7 +93,7 @@ for my $beat (0..15) {
 }
 
 # we expect each char to be a 16th note
-sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message ) {
+sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1 ) {
 	$pattern =~ m!^\s*\w+\s*\|((?:[\w\-]{16})+)\|+!
 	    or croak "Invalid pattern '$pattern'";
 	my @beats = split //, $1;
@@ -102,7 +102,7 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message ) {
 	while( $ofs < @beats ) {
 		if( $beats[ $ofs ] ne '-' ) {
 			$sequencer->[beat($ofs,$track)] =
-			    $osc->message($osc_message, 'f' => 0.75);
+			    $osc->message($osc_message, 'f' => $vol);
 			;
 		}
 		$ofs++;

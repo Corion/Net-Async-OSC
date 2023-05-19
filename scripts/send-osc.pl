@@ -60,11 +60,11 @@ sub beat($beat, $track) {
 
 my $sequencer = [];
 
-for my $beat (0..15) {
-    $sequencer->[beat($beat*4+2,0)] = [
+for my $beat (0..7) {
+    $sequencer->[beat($beat*8+4,0)] = [
     # Maybe we should pre-cook the OSC message even, to take
     # load out of the output loop
-    "/trigger/tb303x" => 'iiffi',
+    "/trigger/tb303" => 'iiffi',
         #(70+int(rand(12)), 0.125, 60+int(rand(50)), 0.8, 0)
         (40+int(rand(24)), 130, 0.1, 0.8+rand(0.15), 0)
     ];
@@ -76,10 +76,10 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
 	    or croak "Invalid pattern '$pattern'";
 	$ticks_per_note //= length($1) / 4;
 	my $p = $1;
-	while( length $p < 64 * $ticks_per_note) {
+	while( length $p < 256 / $ticks_per_note) {
 		$p .= $1;
 	}
-		
+		say $p;
 	my @beats = split //, $p;
 	my $ofs = 0;
 
@@ -87,11 +87,14 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
 		if( $beats[ $ofs ] ne '-' ) {
 			$sequencer->[loc($ofs*$ticks_per_note,$track)] =
 			    $osc->message($osc_message, 'f' => $vol);
-			;
+		} else {
+			$sequencer->[loc($ofs*$ticks_per_note,$track)] =
+			    undef;
 		}
 		$ofs++;
 	}
-	say loc($ofs*$ticks_per_note,$track);
+	print "\r". loc(($ofs-1)*$ticks_per_note,$track);
+	print "\n";
 }
 
 # 64 16th notes
@@ -102,23 +105,37 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
 #parse_drum_pattern($sequencer, 3, ' B|o---------------o---------------o---------------o---------------||', '/trigger/bd');
 
 # One Drop
-#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
-#parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
-#parse_drum_pattern($sequencer, 4, ' B|o-------o-------o-------o-------o-------o-------o-------o-------||', '/trigger/bd');
+parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh',1,4);
+parse_drum_pattern($sequencer, 3, ' S|--------o-------||', '/trigger/sn',1,4);
+parse_drum_pattern($sequencer, 4, ' B|--------o-------||', '/trigger/bd',1,4);
 
 
 # Reggaeton
-parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh',0.25,2);
-parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
-parse_drum_pattern($sequencer, 3, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
-
+#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh',0.25,2);
+#parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
+#parse_drum_pattern($sequencer, 3, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 
 # "Expand" the array to the full length
-my $last = beat(16*4,0)-1;
+# This should simply be the next multiple of $beats*$ticks*$tracks, no?!
+my $last = beat(16,0) -1;
 $sequencer->[$last]= undef;
 
+# Round up to a 4/4 bar
 say $last;
 say scalar @$sequencer;
+my $ticks_in_bar = @$sequencer / $tracks;
+while( int( $ticks_in_bar ) != $ticks_in_bar ) {
+	$ticks_in_bar = int($ticks_in_bar)+1;
+	
+	while( $ticks_in_bar % 16 != 0 ) {
+		$ticks_in_bar += (16 - ($ticks_in_bar % 16));
+	}
+	
+	# expand
+	$sequencer->[loc($ticks_in_bar,0)-1] = undef;
+	
+	say (@$sequencer / $tracks);
+}
 
 my $tick = 0;
 my $ticks_in_bar = @$sequencer / $tracks;

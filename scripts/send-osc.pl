@@ -110,10 +110,25 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message ) {
 }
 
 # 64 16th notes
+# Half Drop
+#                                     1   2   3   4   1   2   3   4
+#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
+#parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
+#parse_drum_pattern($sequencer, 3, ' B|o---------------o---------------o---------------o---------------||', '/trigger/bd');
+
+# One Drop
 #                                     1   2   3   4   1   2   3   4
 parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
 parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
-parse_drum_pattern($sequencer, 3, ' B|o---------------o---------------o---------------o---------------||', '/trigger/bd');
+parse_drum_pattern($sequencer, 4, ' B|o-------o-------o-------o-------o-------o-------o-------o-------||', '/trigger/bd');
+
+
+# Reggaeton
+# Is this too slow?!
+#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
+#parse_drum_pattern($sequencer, 3, ' S|----------------------o-----o-------------------------o-----o---||', '/trigger/sn');
+#parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------o-------o-------o-------o-------||', '/trigger/bd');
+
 
 # "Expand" the array to the full length
 my $last = beat(16*4,0)-1;

@@ -96,7 +96,11 @@ for my $beat (0..15) {
 sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1 ) {
 	$pattern =~ m!^\s*\w+\s*\|((?:[\w\-]{16})+)\|+!
 	    or croak "Invalid pattern '$pattern'";
-	my @beats = split //, $1;
+	my $p = $1;
+	while( length $p < 64 ) {
+		$p .= $1;
+	}
+	my @beats = split //, $p;
 	my $ofs = 0;
 
 	while( $ofs < @beats ) {

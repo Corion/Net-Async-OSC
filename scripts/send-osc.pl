@@ -81,14 +81,28 @@ my @harmonies = ([$base,'major'],
 				 [$base+7,'dim'],
 				 [$base+7,'dim'],
 	);
+	
 my $harmony = -1;
+
+my @bassline = (split //, "o-------o---------------o---o---");
+my $bass_ofs = 0;
 for my $beat (0..7) {
+	$harmony = ($harmony+1)%@harmonies;
     $sequencer->[beat($beat*8+4,1)] = [
     # Maybe we should pre-cook the OSC message even, to take
     # load out of the output loop
-    "/trigger/chord" => 'is',
-        ($harmonies[ $harmony = ($harmony+1)%@harmonies]->@* )
+    "/trigger/chord" => 'is', ($harmonies[ $harmony ]->@* )
     ];
+	
+	# Bassline
+	for my $ofs (0..7) {
+		if( $bassline[ $bass_ofs ] ne '-' ) {
+			$sequencer->[beat($beat*8+$ofs,5)] = [
+				"/trigger/bass" => 'i', ($harmonies[ $harmony ]->[0] - 24 )
+			];
+		};
+		$bass_ofs = (($bass_ofs+1) % scalar @bassline)
+	}
 }
 
 # Another track with a "bassline" based on the harmonies above

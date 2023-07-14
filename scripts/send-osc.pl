@@ -70,6 +70,32 @@ for my $beat (0..7) {
     ];
 }
 
+# The harmonies
+my $base = 64;
+my @harmonies = ([$base,'major'],
+				 [$base,'major'],
+				 [$base+5,'m7'],
+				 [$base+5,'m7'],
+				 [$base,'major'],
+				 [$base,'major'],
+				 [$base+7,'dim'],
+				 [$base+7,'dim'],
+	);
+my $harmony = -1;
+for my $beat (0..7) {
+    $sequencer->[beat($beat*8+4,1)] = [
+    # Maybe we should pre-cook the OSC message even, to take
+    # load out of the output loop
+    "/trigger/chord" => 'is',
+        ($harmonies[ $harmony = ($harmony+1)%@harmonies]->@* )
+    ];
+}
+
+# Another track with a "bassline" based on the harmonies above
+# Should we model the bass like a drum?!
+
+# Another track with a "melody" based on the harmonies above
+
 # we expect each char to be a 32th note (?!)
 sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks_per_note=undef) {
 	$pattern =~ m!^\s*\w+\s*\|((?:[\w\-]{16})+)\|+!

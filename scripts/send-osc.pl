@@ -48,7 +48,7 @@ my $udp = new_socket($loop, '127.0.0.1', 4560);
 my $bpm    = 120;
 my $beats  = 4; # 4/4
 my $ticks  = 4; # ticks per beat, means 1/16th notes
-my $tracks = 4; # so far...
+my $tracks = 8; # so far...
 
 sub loc($tick, $track) {
     $tick*$tracks+$track

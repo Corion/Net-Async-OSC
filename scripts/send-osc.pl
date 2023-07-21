@@ -186,6 +186,7 @@ say "You have defined $ticks_in_bar ticks";
 $| = 1;
 
 # Periodically swap $sequencer for the next bar/ set of 16 beats / whatever
+# Also bridge, breakdown, drop
 
 # We should be able to pause / restart / resume / resync the code
 # For resync, we need to keep track of the start time or increase our tick counter

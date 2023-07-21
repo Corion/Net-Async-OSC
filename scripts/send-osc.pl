@@ -7,6 +7,8 @@ use Carp 'croak';
 use IO::Async::Loop;
 use IO::Async::Timer::Periodic;
 use Net::Async::OSC;
+use Music::VoiceGen;
+use Music::Scales;
 
 my $loop = IO::Async::Loop->new();
 my $osc = Net::Async::OSC->new(
@@ -14,7 +16,7 @@ my $osc = Net::Async::OSC->new(
 );
 $osc->connect('127.0.0.1', 4560)->get;
 
-my $bpm    = 100;
+my $bpm    = 97;
 my $beats  = 4; # 4/4
 my $ticks  = 4; # ticks per beat, means 1/16th notes
 my $tracks = 8; # so far...
@@ -27,23 +29,26 @@ sub beat($beat, $track) {
     return loc($ticks*$beat,$track)
 }
 
+# create_sequencer() ?
 my $sequencer = [];
 
-for my $beat (0..7) {
-    $sequencer->[beat($beat*8+4,0)] = [
-    # Maybe we should pre-cook the OSC message even, to take
-    # load out of the output loop
-    "/trigger/tb303" => 'iiffi',
-        #(70+int(rand(12)), 0.125, 60+int(rand(50)), 0.8, 0)
-        (40+int(rand(24)), 130, 0.1, 0.8+rand(0.15), 0)
-    ];
+sub random_melody( $track ) {
+	for my $beat (0..7) {
+		$sequencer->[beat($beat*8+4,$track)] = [
+		# Maybe we should pre-cook the OSC message even, to take
+		# load out of the output loop
+		"/trigger/tb303" => 'iiffi',
+			#(70+int(rand(12)), 0.125, 60+int(rand(50)), 0.8, 0)
+			(40+int(rand(24)), 130, 0.1, 0.8+rand(0.15), 0)
+		];
+	}
 }
 
 # The harmonies
 # Maybe we want markov-style progressions, or some other weirdo set?
 my $base = 64;
-my @harmonies = ([$base,'major'],
-				 [$base,'major'],
+my @harmonies = ([$base,  'major'],
+				 [$base,  'M7'],
 				 [$base+7,'major'],
 				 [$base+7,'major'],
 				 [$base+9,'min'],
@@ -51,7 +56,7 @@ my @harmonies = ([$base,'major'],
 				 [$base+5,'major'],
 				 [$base+5,'major'],
 	);
-	
+
 my $harmony = -1;
 
 my @bassline = (split //, "o-------o---------------o---o---");
@@ -59,9 +64,9 @@ my $bass_ofs = 0;
 for my $beat (0..7) {
 	$harmony = ($harmony+1)%@harmonies;
     $sequencer->[beat($beat*8+4,1)] = [
-    # Maybe we should pre-cook the OSC message even, to take
-    # load out of the output loop
-    "/trigger/chord" => 'is', ($harmonies[ $harmony ]->@* )
+		# Maybe we should pre-cook the OSC message even, to take
+		# load out of the output loop
+		"/trigger/chord" => 'is', ($harmonies[ $harmony ]->@* )
     ];
 	
 	# Bassline
@@ -79,6 +84,43 @@ for my $beat (0..7) {
 # Should we model the bass like a drum?!
 
 # Another track with a "melody" based on the harmonies above
+sub generate_melody( $harmonies, $sequencer, $track ) {
+	#my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
+	my @melody = (split //, "o-o-");
+
+    my %chord_names = (
+	    #min   => 'melodic minor',
+	    min   => 'm',
+	    major => 'base',
+	);
+
+	my $rhythm_ofs = 0;
+	for my $beat (0..7) {
+		# Select the next harmony
+		$harmony = ($harmony+1)%@harmonies;
+		use Music::Chord::Note;
+		my $h = $harmonies[ $harmony ];
+		my $chord_name = $chord_names{ $h->[1]} // $h->[1];
+		my $cn = Music::Chord::Note->new();
+		my @scale = map { $_ + $h->[0], $_ + $h->[0]+12 } $cn->chord_num( $chord_name );
+		# these are only the boring notes, but I'm not sure how to bring half-tones
+        # and harmonic progression stuff in here
+		my $generator = Music::VoiceGen->new(
+		    pitches => [@scale],
+			intervals => [qw/1 2 3 -1 -2 -3/], # we are not a great vocalist
+		);
+		for my $ofs (0..7) {
+			if( $melody[ $rhythm_ofs ] ne '-' ) {
+				my $note = $generator->rand;
+				say $note;
+				$sequencer->[beat($beat*8+$ofs,$track)] = [
+					"/trigger/melody" => 'i', ($note)
+				];
+			};
+			$rhythm_ofs = (($rhythm_ofs+1) % scalar @melody)
+		}
+	}
+}
 
 # we expect each char to be a 32th note (?!)
 sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks_per_note=undef) {
@@ -128,6 +170,7 @@ sub generate_reggaeton( $sequencer ) {
 	parse_drum_pattern($sequencer, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 }
 generate_one_drop($sequencer);
+generate_melody( \@harmonies, $sequencer, 6 );
 
 # "Expand" the array to the full length
 # This should simply be the next multiple of $beats*$ticks*$tracks, no?!

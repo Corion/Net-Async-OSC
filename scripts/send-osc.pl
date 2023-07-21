@@ -14,7 +14,7 @@ my $osc = Net::Async::OSC->new(
 );
 $osc->connect('127.0.0.1', 4560)->get;
 
-my $bpm    = 120;
+my $bpm    = 100;
 my $beats  = 4; # 4/4
 my $ticks  = 4; # ticks per beat, means 1/16th notes
 my $tracks = 8; # so far...
@@ -40,15 +40,16 @@ for my $beat (0..7) {
 }
 
 # The harmonies
+# Maybe we want markov-style progressions, or some other weirdo set?
 my $base = 64;
 my @harmonies = ([$base,'major'],
 				 [$base,'major'],
-				 [$base+5,'m7'],
-				 [$base+5,'m7'],
-				 [$base,'major'],
-				 [$base,'major'],
-				 [$base+7,'dim'],
-				 [$base+7,'dim'],
+				 [$base+7,'major'],
+				 [$base+7,'major'],
+				 [$base+9,'min'],
+				 [$base+9,'min'],
+				 [$base+5,'major'],
+				 [$base+5,'major'],
 	);
 	
 my $harmony = -1;

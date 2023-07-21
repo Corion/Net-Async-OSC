@@ -4,46 +4,15 @@ use feature 'signatures';
 no warnings 'experimental::signatures';
 use Carp 'croak';
 
-use Protocol::OSC;
 use IO::Async::Loop;
-use IO::Async::Socket;
 use IO::Async::Timer::Periodic;
-use Socket 'pack_sockaddr_in', 'inet_aton'; # IPv6 support?!
-
-my $osc = Protocol::OSC->new;
-
-sub new_socket( $loop, $host, $port ) {
-    my $pingback = IO::Async::Socket->new(
-        on_recv => sub( $sock, $data, $addr, @rest ) {
-            warn "Reply: $data";
-        },
-        #on_recv_error => sub {
-        #   my ( $self, $errno ) = @_;
-        #   warn "Cannot recv - $errno\n";
-        #},
-    );
-    $loop->add( $pingback );
-    # What about multihomed hosts?!
-    $pingback->connect(
-        host => $host,
-        service => $port,
-        socktype => 'dgram'
-    )->get;
-    return $pingback
-}
-
-sub send_osc( $socket, @message ) {
-    my $data = $osc->message(@message); # pack
-    send_osc_msg( $socket, $data );
-}
-
-sub send_osc_msg( $socket, $data ) {
-    say join " , " , @{ $osc->parse( $data ) };
-    $socket->send( $data );
-}
+use Net::Async::OSC;
 
 my $loop = IO::Async::Loop->new();
-my $udp = new_socket($loop, '127.0.0.1', 4560);
+my $osc = Net::Async::OSC->new(
+    loop => $loop,
+);
+$osc->connect('127.0.0.1', 4560)->get;
 
 my $bpm    = 120;
 my $beats  = 4; # 4/4
@@ -126,7 +95,7 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
 	while( $ofs < @beats ) {
 		if( $beats[ $ofs ] ne '-' ) {
 			$sequencer->[loc($ofs*$ticks_per_note,$track)] =
-			    $osc->message($osc_message, 'f' => $vol);
+			    $osc->osc->message($osc_message, 'f' => $vol);
 		} else {
 			$sequencer->[loc($ofs*$ticks_per_note,$track)] =
 			    undef;
@@ -210,14 +179,14 @@ sub play_sounds {
 					if( $r eq 'CODE' ) {
 						# Can we pass any meaningful parameters here?
 						# Like maybe the current tick?!
-						send_osc( $udp, $n->($tick) );
+						$osc->send_osc( $n->($tick) );
 					} elsif( $r eq 'ARRAY' ) {
-						send_osc( $udp, @$n );
+						$osc->send_osc( @$n );
 					}
 
 				} else {
 		#print sprintf "%d / %d / %d - $ticks_in_bar - beat\r", $tick, $loc, scalar @$sequencer;
-					send_osc_msg( $udp, $n );
+					$osc->send_osc_msg( $n );
 				}
 			}
 		}
@@ -227,7 +196,6 @@ sub play_sounds {
 	$tick = ($tick+1)%$ticks_in_bar;
 
 }
-
 
 my $timer = IO::Async::Timer::Periodic->new(
     reschedule => 'skip',

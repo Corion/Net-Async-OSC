@@ -201,7 +201,7 @@ sub play_sounds {
 	if( $output_state eq 'silent' ) {
 		# do nothing
 	} else {
-		print sprintf "%d / %d / %d\r", $tick, $loc, scalar @$sequencer;
+		#print sprintf "%d / %d / %d\r", $tick, $loc, scalar @$sequencer;
 		for my $s ($loc..$loc+$tracks-1) {
 			my $n = $sequencer->[$s];
 			if( $n ) {
@@ -216,7 +216,7 @@ sub play_sounds {
 					}
 
 				} else {
-		print sprintf "%d / %d / %d - $ticks_in_bar - beat\r\n", $tick, $loc, scalar @$sequencer;
+		#print sprintf "%d / %d / %d - $ticks_in_bar - beat\r", $tick, $loc, scalar @$sequencer;
 					send_osc_msg( $udp, $n );
 				}
 			}

@@ -103,27 +103,31 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
 		}
 		$ofs++;
 	}
-	print "\r". loc(($ofs-1)*$ticks_per_note,$track);
-	print "\n";
+	#print "\r". loc(($ofs-1)*$ticks_per_note,$track);
+	#print "\n";
 }
 
-# 64 16th notes
 # Half Drop
-#                                      1       2       3       4       1       2       3       4   
-#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh');
-#parse_drum_pattern($sequencer, 3, ' S|--------o---------------o---------------o---------------o-------||', '/trigger/sn');
-#parse_drum_pattern($sequencer, 3, ' B|o---------------o---------------o---------------o---------------||', '/trigger/bd');
+sub generate_half_drop( $sequencer ) {
+    parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh');
+    parse_drum_pattern($sequencer, 3, ' S|--------o-------||', '/trigger/sn');
+    parse_drum_pattern($sequencer, 4, ' B|o-------o-------||', '/trigger/bd');
+}
 
 # One Drop
-parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh',1,4);
-parse_drum_pattern($sequencer, 3, ' S|--------o-------||', '/trigger/sn',1,4);
-parse_drum_pattern($sequencer, 4, ' B|--------o-------||', '/trigger/bd',1,4);
-
+sub generate_one_drop( $sequencer ) {
+    parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh',1,4);
+    parse_drum_pattern($sequencer, 3, ' S|--------o-------||', '/trigger/sn',1,4);
+    parse_drum_pattern($sequencer, 4, ' B|--------o-------||', '/trigger/bd',1,4);
+}
 
 # Reggaeton
-#parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-||', '/trigger/hh',0.25,2);
-#parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
-#parse_drum_pattern($sequencer, 3, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
+sub generate_reggaeton( $sequencer ) {
+	parse_drum_pattern($sequencer, 2, 'HH|x---x---x---x---x---x---x---x---||', '/trigger/hh',0.25,2);
+	parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
+	parse_drum_pattern($sequencer, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
+}
+generate_one_drop($sequencer);
 
 # "Expand" the array to the full length
 # This should simply be the next multiple of $beats*$ticks*$tracks, no?!

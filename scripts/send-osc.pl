@@ -242,3 +242,13 @@ my $timer = IO::Async::Timer::Periodic->new(
 $timer->start;
 $loop->add( $timer );
 $loop->run;
+
+__END__
+
+[ ] Have multiple progressions, and switch between those
+[ ] Move code from main program into subroutines, "expand_progression()"
+[ ] Patterns can then become expand_pattern("AABA"), which calls expand_progression()
+[ ] Songs are patterns like "IIAABBAABBCCBBCxAABBAABBAABBCCBBCCBBCCBBCCBBOO"
+    where "II" are intro patterns (without melody)
+	      "OO" are outro patterns
+	      "xx" are breakdown patterns

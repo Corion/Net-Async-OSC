@@ -83,8 +83,29 @@ for my $beat (0..7) {
 
 # Another track with a "bassline" based on the harmonies above
 # Should we model the bass like a drum?!
+my %chord_names = (
+    #min   => 'melodic minor',
+    min   => 'm',
+    major => 'base',
+);
 
-sub melody_step( $tick, $curr_harmony, $next_harmony ) {
+sub melody_step( $tick, $curr_harmony, $next_harmony, $last_note ) {
+    my $h = $harmonies[ $harmony ];
+    my $chord_name = $chord_names{ $h->[1]} // $h->[1];
+    my $cn = Music::Chord::Note->new();
+
+	# Cache this?!
+    my @scale = map { $_ + $h->[0], $_ + $h->[0]+12 } $cn->chord_num( $chord_name );
+    # these are only the boring notes, but I'm not sure how to bring half-tones
+    # and harmonic progression stuff in here
+    my $generator = Music::VoiceGen->new(
+        pitches => [@scale],
+        intervals => [qw/1 2 3 -1 -2 -3/], # we are not a great vocalist
+    );
+	$generator->context( $last_note )
+	    if defined $last_note;
+
+	return $generator->rand;
 }
 
 # Another track with a "melody" based on the harmonies above
@@ -92,33 +113,19 @@ sub generate_melody( $harmonies, $sequencer, $track ) {
     #my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
     my @melody = (split //, "o-o-");
 
-    my %chord_names = (
-        #min   => 'melodic minor',
-        min   => 'm',
-        major => 'base',
-    );
-
     my $rhythm_ofs = 0;
     for my $beat (0..7) {
         # Select the next harmony
         $harmony = ($harmony+1)%@harmonies;
-        my $h = $harmonies[ $harmony ];
-        my $chord_name = $chord_names{ $h->[1]} // $h->[1];
-        my $cn = Music::Chord::Note->new();
-        my @scale = map { $_ + $h->[0], $_ + $h->[0]+12 } $cn->chord_num( $chord_name );
-        # these are only the boring notes, but I'm not sure how to bring half-tones
-        # and harmonic progression stuff in here
-        my $generator = Music::VoiceGen->new(
-            pitches => [@scale],
-            intervals => [qw/1 2 3 -1 -2 -3/], # we are not a great vocalist
-        );
+        my $next_harmony = ($harmony+1)%@harmonies;
+		my $last_note;
         for my $ofs (0..7) {
             if( $melody[ $rhythm_ofs ] ne '-' ) {
-                my $note = $generator->rand;
-                #say $note;
+                my $note = melody_step( $ofs, $harmony, $next_harmony, $last_note );
                 $sequencer->[beat($beat*8+$ofs,$track)] = [
                     "/trigger/melody" => 'i', ($note)
                 ];
+				$last_note = $note;
             };
             $rhythm_ofs = (($rhythm_ofs+1) % scalar @melody)
         }

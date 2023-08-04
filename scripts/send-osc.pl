@@ -90,31 +90,34 @@ my @harmonies = ([$base,  'major'], #C
                  [$base+7,'major'], #G
 );
 
-my $bass_harmony = -1;
 my $chord_track = 1;
 my $info_track = 0;
 
-my @bassline = (split //, "o-------o---------------o---o---");
-my $bass_ofs = 0;
-for my $beat (0..$#harmonies) {
-    $bass_harmony = ($bass_harmony+1)%@harmonies;
-    my $ofs = beat($beat*8+4,$info_track);
-    $sequencer->[$ofs+$_*$tracks] = sprintf "%d %s", $harmonies[ $bass_harmony ]->@*
-        for 0..$ticks*$beats-1;
-    $sequencer->[beat($beat*8+4,$chord_track)] = [
-        # Maybe we should pre-cook the OSC message even, to take
-        # load out of the output loop
-        "/trigger/chord" => 'is', ($harmonies[ $bass_harmony ]->@* )
-    ];
+sub generate_bassline( $sequencer, $harmonies, $bassline, $chord_track, $info_track ) {
+    my $bass_harmony = -1;
 
-    # Bassline
-    for my $ofs (0..7) {
-        if( $bassline[ $bass_ofs ] ne '-' ) {
-            $sequencer->[beat($beat*8+$ofs,5)] = [
-                "/trigger/bass" => 'i', ($harmonies[ $bass_harmony ]->[0] - 24 )
-            ];
-        };
-        $bass_ofs = (($bass_ofs+1) % scalar @bassline)
+    my @bassline = (split //, $bassline);
+    my $bass_ofs = 0;
+    for my $beat (0..$#$harmonies) {
+        $bass_harmony = ($bass_harmony+1)%@$harmonies;
+        my $ofs = beat($beat*8+4,$info_track);
+        $sequencer->[$ofs+$_*$tracks] = sprintf "%d %s", $harmonies[ $bass_harmony ]->@*
+            for 0..$ticks*$beats-1;
+        $sequencer->[beat($beat*8+4,$chord_track)] = [
+            # Maybe we should pre-cook the OSC message even, to take
+            # load out of the output loop
+            "/trigger/chord" => 'is', ($harmonies[ $bass_harmony ]->@* )
+        ];
+
+        # Bassline
+        for my $ofs (0..7) {
+            if( $bassline[ $bass_ofs ] ne '-' ) {
+                $sequencer->[beat($beat*8+$ofs,5)] = [
+                    "/trigger/bass" => 'i', ($harmonies[ $bass_harmony ]->[0] - 24 )
+                ];
+            };
+            $bass_ofs = (($bass_ofs+1) % scalar @bassline)
+        }
     }
 }
 
@@ -126,7 +129,7 @@ my %chord_names = (
     major => 'base',
 );
 
-sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note ) {
+sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note, $chord_track ) {
     my $h = $harmonies[ $curr_harmony ];
     my $chord_name = $chord_names{ $h->[1]} // $h->[1];
     my $cn = Music::Chord::Note->new();
@@ -148,21 +151,22 @@ sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note ) {
         or die "Unknown harmony '$h->[1]' for chord";
     my @scale;
 
-    if( $sequencer->[beat($tick*8+4,$chord_track)]) {
+    if( $sequencer->[beat($tick,$chord_track)]) {
         # Use a note in line with the currently playing chord
         my $cn = Music::Chord::Note->new();
         @scale = map { $base + $_ } $cn->chord_num($chord_name);
     } else {
         # Use a random note
-        @scale = get_scale_MIDI($base, 4, $scale_name, 0);
+        @scale = grep { $_ != $last_note }
+                      get_scale_MIDI($base, 4, $scale_name, 0);
     }
     return $scale[ int rand @scale ];
 }
 
 # Another track with a "melody" based on the harmonies above
-sub generate_melody( $harmonies, $sequencer, $track ) {
+sub generate_melody( $harmonies, $sequencer, $track, $chord_track ) {
     #my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
-    my @melody = (split //, "o-------");
+    my @melody = (split //, "o---o---");
 
     my $harmony = -1;
 
@@ -174,7 +178,7 @@ sub generate_melody( $harmonies, $sequencer, $track ) {
         my $last_note;
         for my $ofs (0..7) {
             if( $melody[ $rhythm_ofs ] ne '-' ) {
-                my $note = melody_step( $ofs, $base, $harmony, $next_harmony, $last_note );
+                my $note = melody_step( $ofs, $base, $harmony, $next_harmony, $last_note, $chord_track );
                 $sequencer->[beat($beat*8+$ofs,$track)] = [
                     "/trigger/melody" => 'i', ($note)
                 ];
@@ -232,8 +236,9 @@ sub generate_reggaeton( $sequencer, $total_bars ) {
     parse_drum_pattern($sequencer, $total_bars, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
     parse_drum_pattern($sequencer, $total_bars, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 }
+generate_bassline($sequencer, \@harmonies, "o-------o---------------o---o---", $chord_track, $info_track);
 generate_one_drop($sequencer, scalar @harmonies);
-generate_melody( \@harmonies, $sequencer, 6 );
+generate_melody( \@harmonies, $sequencer, 6, $chord_track );
 
 # "Expand" the array to the full length
 # This should simply be the next multiple of $beats*$ticks*$tracks, no?!
@@ -311,7 +316,7 @@ sub play_sounds {
                 $loop->stop;
             } else {
                 msg("Keypress '$key' ($ev[5])")
-                    if $key =~ /\S/;
+                    if $ev[5];
             }
         }
     }
@@ -374,7 +379,6 @@ $loop->run;
 __END__
 
 [ ] Have multiple progressions, and switch between those
-[ ] Move code from main program into subroutines, "expand_progression()"
 [ ] Patterns can then become expand_pattern("AABA"), which calls expand_progression()
 [ ] Songs are patterns like "IIAABBAABBCCBBCxAABBAABBAABBCCBBCCBBCCBBCCBBOO"
     where "II" are intro patterns (without melody)

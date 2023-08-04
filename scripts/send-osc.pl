@@ -66,23 +66,37 @@ sub random_melody( $track ) {
 # The harmonies
 # Maybe we want markov-style progressions, or some other weirdo set?
 my $base = 50 + int(rand(32));
-my @harmonies = ([$base,  'major'],
-                 [$base,  'M7'],
-                 [$base+7,'major'],
-                 [$base+7,'major'],
+my @harmonies = ([$base,  'major'], #C
+                 [$base,  'major'],
+                 #[$base,  'M7'],
+                 [$base+7,'major'], #G
+                 [$base+7,'major'], #G
+                 [$base+9,'min'],   #A
                  [$base+9,'min'],
-                 [$base+9,'min'],
-                 [$base+5,'major'],
-                 [$base+5,'M7'],
+                 [$base+5,'major'], #F
+                 [$base+5,'major'], #F
+                 #[$base+5,'M7'],
+                 [$base,  'major'], #C
+                 [$base,  'major'], #C
+                 [$base+7,'major'], #G
+                 [$base+7,'major'], #G
+                 [$base,  'major'], #C
+                 [$base,  'major'], #C
+                 [$base+7,'major'], #G
+                 [$base+7,'major'], #G
 );
 
 my $bass_harmony = -1;
 my $chord_track = 1;
+my $info_track = 0;
 
 my @bassline = (split //, "o-------o---------------o---o---");
 my $bass_ofs = 0;
-for my $beat (0..7) {
+for my $beat (0..$#harmonies) {
     $bass_harmony = ($bass_harmony+1)%@harmonies;
+    my $ofs = beat($beat*8+4,$info_track);
+    $sequencer->[$ofs+$_*$tracks] = sprintf "%d %s", $harmonies[ $bass_harmony ]->@*
+        for 0..$ticks*$beats-1;
     $sequencer->[beat($beat*8+4,$chord_track)] = [
         # Maybe we should pre-cook the OSC message even, to take
         # load out of the output loop
@@ -103,7 +117,7 @@ for my $beat (0..7) {
 # Another track with a "bassline" based on the harmonies above
 # Should we model the bass like a drum?!
 my %chord_names = (
-	'M7'  => 'M7',
+    'M7'  => 'M7',
     min   => 'm',
     major => 'base',
 );
@@ -113,63 +127,63 @@ sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note ) {
     my $chord_name = $chord_names{ $h->[1]} // $h->[1];
     my $cn = Music::Chord::Note->new();
 
-	# Cache this?!
+    # Cache this?!
     #my @scale = map { $_ + $h->[0], $_ + $h->[0]+12 } $cn->chord_num( $chord_name );
     # these are only the boring notes, but I'm not sure how to bring half-tones
     # and harmonic progression stuff in here
 
     # For the harmonic stuff, we know what scales match to our chords:
-	my %scales = (
-	    major => 'major',
-		min   => 'minor',
-		'M7'  => 'major',
-	);
-	my $scale_name = $scales{ $h->[1] }
-	    or die "Unknown harmony '$h->[1]'";
-	my $chord_name = $chord_names{ $h->[1] }
-	    or die "Unknown harmony '$h->[1]' for chord";
+    my %scales = (
+        major => 'major',
+        min   => 'minor',
+        'M7'  => 'major',
+    );
+    my $scale_name = $scales{ $h->[1] }
+        or die "Unknown harmony '$h->[1]'";
+    my $chord_name = $chord_names{ $h->[1] }
+        or die "Unknown harmony '$h->[1]' for chord";
     my @scale;
 
     if( $sequencer->[beat($tick*8+4,$chord_track)]) {
-		# Use a note in line with the currently playing chord
-		my $cn = Music::Chord::Note->new();
-	    @scale = map { $base + $_ } $cn->chord_num($chord_name);
-	} else {
-		# Use a random note
-	    @scale = get_scale_MIDI($base, 4, $scale_name, 0);
-	}
-	return $scale[ int rand @scale ];
+        # Use a note in line with the currently playing chord
+        my $cn = Music::Chord::Note->new();
+        @scale = map { $base + $_ } $cn->chord_num($chord_name);
+    } else {
+        # Use a random note
+        @scale = get_scale_MIDI($base, 4, $scale_name, 0);
+    }
+    return $scale[ int rand @scale ];
 
     #my $generator = Music::VoiceGen->new(
     #    pitches => [@scale],
     #    intervals => [qw/1 2 3 -1 -2 -3/], # we are not a great vocalist
     #);
-	#$generator->context( $last_note )
-	#    if defined $last_note;
-	#
-	#return $generator->rand;
+    #$generator->context( $last_note )
+    #    if defined $last_note;
+    #
+    #return $generator->rand;
 }
 
 # Another track with a "melody" based on the harmonies above
 sub generate_melody( $harmonies, $sequencer, $track ) {
     my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
     #my @melody = (split //, "o---");
-	
-	my $harmony = -1;
+
+    my $harmony = -1;
 
     my $rhythm_ofs = 0;
-    for my $beat (0..7) {
+    for my $beat (0..$#$harmonies) {
         # Select the next harmony
-        $harmony = ($harmony+1)%@harmonies;
-        my $next_harmony = ($harmony+1)%@harmonies;
-		my $last_note;
+        $harmony = ($harmony+1)%@$harmonies;
+        my $next_harmony = ($harmony+1)%@$harmonies;
+        my $last_note;
         for my $ofs (0..7) {
             if( $melody[ $rhythm_ofs ] ne '-' ) {
                 my $note = melody_step( $ofs, $base, $harmony, $next_harmony, $last_note );
                 $sequencer->[beat($beat*8+$ofs,$track)] = [
                     "/trigger/melody" => 'i', ($note)
                 ];
-				$last_note = $note;
+                $last_note = $note;
             };
             $rhythm_ofs = (($rhythm_ofs+1) % scalar @melody)
         }
@@ -224,7 +238,7 @@ sub generate_reggaeton( $sequencer ) {
     parse_drum_pattern($sequencer, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 }
 generate_one_drop($sequencer);
-generate_melody( \@harmonies, $sequencer, 7 );
+generate_melody( \@harmonies, $sequencer, 6 );
 
 # "Expand" the array to the full length
 # This should simply be the next multiple of $beats*$ticks*$tracks, no?!

@@ -278,6 +278,20 @@ my $output_state = '';
 my @playing = ('' x (1+$tracks));
 my @mute    = ('' x (1+$tracks));
 
+sub toggle_mute($track, $mute=undef) {
+    my $val = $mute;
+
+    if( ! defined $val ) {
+        if( $mute[ $track ] ) {
+            $val = '';
+        } else {
+            $val = 'mute';
+        }
+    }
+
+    $mute[ $track ] = $val;
+}
+
 sub play_sounds {
     my $loc = loc($tick, 0) % @$sequencer;
 
@@ -288,13 +302,16 @@ sub play_sounds {
         if( $ev[0] == 1 and $ev[1] ) {
             my $key = chr($ev[5]);
             if( $key =~ /\d/ ) {
-                if( $mute[ $key ] ) {
-                    $mute[ $key ] = '';
-                } else {
-                    $mute[ $key ] = 'mute';
-                }
+                toggle_mute($key);
+            } elsif( $key eq 'm' ) {
+                toggle_mute($_, 'mute') for 0..$tracks-1;
+            } elsif( $key eq 'u' ) {
+                toggle_mute($_, '') for 0..$tracks-1;
+            } elsif( $key eq 'q' ) {
+                $loop->stop;
             } else {
-                msg("Keypress '$key'");
+                msg("Keypress '$key' ($ev[5])")
+                    if $key =~ /\S/;
             }
         }
     }

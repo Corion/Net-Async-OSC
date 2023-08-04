@@ -31,21 +31,24 @@ live_loop :chords do
 end
 #end
 
-use_synth :pluck
+use_synth :bass_foundation
 live_loop :bass do
   use_real_time
   note =  sync "/osc*/trigger/bass"
-  synth :bass_foundation, note: note, release: 1
+  synth :bass_foundation, note: note, release: 1, amp: 0.75
 end
 
 
 use_synth :organ_tonewheel
-with_fx :reverb, mix: 0.2 do
-  with_fx :wobble,cutoff_max: 90, phase: 4, filter: 1 do
-    live_loop :tb303 do
-      use_real_time
-      note =  sync "/osc*/trigger/melody"
-      synth :organ_tonewheel, note: note
-    end
+melody = play :C4, sustain: 60*60*2
+melody.pause
+#with_fx :reverb, mix: 0.1 do
+with_fx :wobble,cutoff_max: 90, phase: 3, filter: 1 do
+  live_loop :tb303 do
+    use_real_time
+    note, = sync "/osc*/trigger/melody"
+    #synth :organ_tonewheel, note: note, release: 0.01, decay: 0.5
+    melody.control note: note
+    melody.run
   end
 end

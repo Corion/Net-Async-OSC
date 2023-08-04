@@ -153,21 +153,12 @@ sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note ) {
         @scale = get_scale_MIDI($base, 4, $scale_name, 0);
     }
     return $scale[ int rand @scale ];
-
-    #my $generator = Music::VoiceGen->new(
-    #    pitches => [@scale],
-    #    intervals => [qw/1 2 3 -1 -2 -3/], # we are not a great vocalist
-    #);
-    #$generator->context( $last_note )
-    #    if defined $last_note;
-    #
-    #return $generator->rand;
 }
 
 # Another track with a "melody" based on the harmonies above
 sub generate_melody( $harmonies, $sequencer, $track ) {
-    my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
-    #my @melody = (split //, "o---");
+    #my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
+    my @melody = (split //, "o-------");
 
     my $harmony = -1;
 

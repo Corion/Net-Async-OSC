@@ -53,9 +53,9 @@ sub beat($beat, $track) {
 }
 
 # create_sequencer() ?
-my $sequencer = [];
+#my $sequencer = [];
 
-sub random_melody( $track ) {
+sub random_melody( $sequencer, $track ) {
     for my $beat (0..7) {
         $sequencer->[beat($beat*8+4,$track)] = [
         # Maybe we should pre-cook the OSC message even, to take
@@ -67,28 +67,50 @@ sub random_melody( $track ) {
     }
 }
 
-# The harmonies
-# Maybe we want markov-style progressions, or some other weirdo set?
-my $base = 50 + int(rand(32));
-my @harmonies = ([$base,  'major'], #C
-                 [$base,  'major'],
-                 #[$base,  'M7'],
-                 [$base+7,'major'], #G
-                 [$base+7,'major'], #G
-                 [$base+9,'min'],   #A
-                 [$base+9,'min'],
-                 [$base+5,'major'], #F
-                 [$base+5,'major'], #F
-                 #[$base+5,'M7'],
-                 [$base,  'major'], #C
-                 [$base,  'major'], #C
-                 [$base+7,'major'], #G
-                 [$base+7,'major'], #G
-                 [$base,  'major'], #C
-                 [$base,  'major'], #C
-                 [$base+7,'major'], #G
-                 [$base+7,'major'], #G
-);
+sub wailers($base) {
+        my @harmonies = ([$base,  'major'], #C
+                    [$base,  'major'],
+                    #[$base,  'M7'],
+                    [$base+7,'major'], #G
+                    [$base+7,'major'], #G
+                    [$base+9,'min'],   #A
+                    [$base+9,'min'],
+                    [$base+5,'major'], #F
+                    [$base+5,'major'], #F
+                    #[$base+5,'M7'],
+                    [$base,  'major'], #C
+                    [$base,  'major'], #C
+                    [$base+7,'major'], #G
+                    [$base+7,'major'], #G
+                    [$base,  'major'], #C
+                    [$base,  'major'], #C
+                    [$base+7,'major'], #G
+                    [$base+7,'major'], #G
+    );
+    return \@harmonies;
+}
+
+sub tosh($base) {
+        my @harmonies = ([$base,  'major'], #C
+                    [$base,  'major'],
+                    #[$base,  'M7'],
+                    [$base+7,'major'], #G
+                    [$base+7,'major'], #G
+    );
+    return \@harmonies;
+}
+
+sub get_harmonies( $base = 50 + int(rand(32)) ) {
+    # The harmonies
+    # Maybe we want markov-style progressions, or some other weirdo set?
+    my $base = 50 + int(rand(32));
+
+    if( rand(1) >= 0.5 ) {
+        return tosh($base)
+    } else {
+        return wailers($base)
+    }
+}
 
 my $chord_track = 1;
 my $info_track = 0;
@@ -101,19 +123,19 @@ sub generate_bassline( $sequencer, $harmonies, $bassline, $chord_track, $info_tr
     for my $beat (0..$#$harmonies) {
         $bass_harmony = ($bass_harmony+1)%@$harmonies;
         my $ofs = beat($beat*8+4,$info_track);
-        $sequencer->[$ofs+$_*$tracks] = sprintf "%d %s", $harmonies[ $bass_harmony ]->@*
+        $sequencer->[$ofs+$_*$tracks] = sprintf "%d %s", $harmonies->[ $bass_harmony ]->@*
             for 0..$ticks*$beats-1;
         $sequencer->[beat($beat*8+4,$chord_track)] = [
             # Maybe we should pre-cook the OSC message even, to take
             # load out of the output loop
-            "/trigger/chord" => 'is', ($harmonies[ $bass_harmony ]->@* )
+            "/trigger/chord" => 'is', ($harmonies->[ $bass_harmony ]->@* )
         ];
 
         # Bassline
         for my $ofs (0..7) {
             if( $bassline[ $bass_ofs ] ne '-' ) {
                 $sequencer->[beat($beat*8+$ofs,5)] = [
-                    "/trigger/bass" => 'i', ($harmonies[ $bass_harmony ]->[0] - 24 )
+                    "/trigger/bass" => 'i', ($harmonies->[ $bass_harmony ]->[0] - 24 )
                 ];
             };
             $bass_ofs = (($bass_ofs+1) % scalar @bassline)
@@ -129,10 +151,14 @@ my %chord_names = (
     major => 'base',
 );
 
-sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note, $chord_track ) {
-    my $h = $harmonies[ $curr_harmony ];
+sub octave($note) {
+    return int($note/12)-1
+}
+
+sub melody_step( $sequencer, $tick, $base, $harmonies, $curr_harmony, $next_harmony, $last_note, $chord_track ) {
+    my $h = $harmonies->[ $curr_harmony ];
     my $chord_name = $chord_names{ $h->[1]} // $h->[1];
-    my $cn = Music::Chord::Note->new();
+    #my $cn = Music::Chord::Note->new();
 
     # Cache this?!
     #my @scale = map { $_ + $h->[0], $_ + $h->[0]+12 } $cn->chord_num( $chord_name );
@@ -151,34 +177,41 @@ sub melody_step( $tick, $base, $curr_harmony, $next_harmony, $last_note, $chord_
         or die "Unknown harmony '$h->[1]' for chord";
     my @scale;
 
-    if( $sequencer->[beat($tick,$chord_track)]) {
+msg($tick);
+    if( $sequencer->[beat($tick,$chord_track)]
+    ) {
         # Use a note in line with the currently playing chord
         my $cn = Music::Chord::Note->new();
         @scale = map { $base + $_ } $cn->chord_num($chord_name);
+    
     } else {
-        # Use a random note
-        @scale = grep { $_ != $last_note }
-                      get_scale_MIDI($base, 4, $scale_name, 0);
+        # Use a random note, that is not too far from the current note
+                
+        @scale = grep {     $_ != $last_note }
+                 grep { abs($_ - $last_note) < 8 }
+                      get_scale_MIDI($base, octave($base), $scale_name, 0),
+                      get_scale_MIDI($base, octave($base)-1, $scale_name, 0),
+                      ;
     }
     return $scale[ int rand @scale ];
 }
 
 # Another track with a "melody" based on the harmonies above
-sub generate_melody( $harmonies, $sequencer, $track, $chord_track ) {
+sub generate_melody( $base, $harmonies, $sequencer, $track, $chord_track ) {
     #my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
     my @melody = (split //, "o---o---");
 
     my $harmony = -1;
 
     my $rhythm_ofs = 0;
+    my $last_note = $base;
     for my $beat (0..$#$harmonies) {
         # Select the next harmony
         $harmony = ($harmony+1)%@$harmonies;
         my $next_harmony = ($harmony+1)%@$harmonies;
-        my $last_note;
-        for my $ofs (0..7) {
+        for my $ofs (0..$#melody) {
             if( $melody[ $rhythm_ofs ] ne '-' ) {
-                my $note = melody_step( $ofs, $base, $harmony, $next_harmony, $last_note, $chord_track );
+                my $note = melody_step( $sequencer, $ofs, $base, $harmonies, $harmony, $next_harmony, $last_note, $chord_track );
                 $sequencer->[beat($beat*8+$ofs,$track)] = [
                     "/trigger/melody" => 'i', ($note)
                 ];
@@ -236,37 +269,47 @@ sub generate_reggaeton( $sequencer, $total_bars ) {
     parse_drum_pattern($sequencer, $total_bars, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
     parse_drum_pattern($sequencer, $total_bars, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 }
-generate_bassline($sequencer, \@harmonies, "o-------o---------------o---o---", $chord_track, $info_track);
-generate_one_drop($sequencer, scalar @harmonies);
-generate_melody( \@harmonies, $sequencer, 6, $chord_track );
 
-# "Expand" the array to the full length
-# This should simply be the next multiple of $beats*$ticks*$tracks, no?!
-my $last = beat(16,0) -1;
-$sequencer->[$last]= undef;
+sub fresh_pattern($base, $harmonies) {
+    my $sequencer = [];
+    my $harmonies = get_harmonies();
 
-# Round up to a 4/4 bar
-msg( $last );
-msg( scalar @$sequencer );
-my $ticks_in_bar = @$sequencer / $tracks;
-while( int( $ticks_in_bar ) != $ticks_in_bar ) {
-    $ticks_in_bar = int($ticks_in_bar)+1;
+    generate_bassline($sequencer, $harmonies, "o-------o---------------o---o---", $chord_track, $info_track);
+    generate_one_drop($sequencer, scalar @$harmonies);
+    generate_melody( $base, $harmonies, $sequencer, 6, $chord_track );
 
-    while( $ticks_in_bar % 16 != 0 ) {
-        $ticks_in_bar += (16 - ($ticks_in_bar % 16));
+    # "Expand" the array to the full length
+    # This should simply be the next multiple of $beats*$ticks*$tracks, no?!
+    my $last = beat(16,0) -1;
+    $sequencer->[$last]= undef;
+    
+    # Round up to a 4/4 bar
+    msg( $last );
+    msg( scalar @$sequencer );
+    my $ticks_in_bar = @$sequencer / $tracks;
+    while( int( $ticks_in_bar ) != $ticks_in_bar ) {
+        $ticks_in_bar = int($ticks_in_bar)+1;
+    
+        while( $ticks_in_bar % 16 != 0 ) {
+            $ticks_in_bar += (16 - ($ticks_in_bar % 16));
+        }
+    
+        # expand
+        $sequencer->[loc($ticks_in_bar,0)-1] = undef;
+    
+        msg(@$sequencer / $tracks);
     }
+    
+    my $tick = 0;
+    my $ticks_in_bar = @$sequencer / $tracks;
+    
+    die "data structure is not a complete bar ($ticks_in_bar)" if int($ticks_in_bar) != $ticks_in_bar;
+    msg( "You have defined $ticks_in_bar ticks" );
 
-    # expand
-    $sequencer->[loc($ticks_in_bar,0)-1] = undef;
-
-    msg(@$sequencer / $tracks);
+    return $sequencer, $ticks_in_bar;
 }
 
-my $tick = 0;
-my $ticks_in_bar = @$sequencer / $tracks;
-
-die "data structure is not a complete bar ($ticks_in_bar)" if int($ticks_in_bar) != $ticks_in_bar;
-msg( "You have defined $ticks_in_bar ticks" );
+#my ($sequencer, $ticks_in_bar) = fresh_pattern(\@harmonies);
 
 $| = 1;
 
@@ -298,6 +341,16 @@ sub toggle_mute($track, $mute=undef) {
 }
 
 sub play_sounds {
+    state $tick;
+    state $sequencer;
+    state $ticks_in_bar;
+    
+    if( ! $sequencer ) {
+        my $harmonies = get_harmonies();
+        my $base = int( 60+rand 24 );
+        ($sequencer, $ticks_in_bar) = fresh_pattern($base, $harmonies);
+    }
+    
     my $loc = loc($tick, 0) % @$sequencer;
 
     # Win32 specific...
@@ -312,6 +365,9 @@ sub play_sounds {
                 toggle_mute($_, 'mute') for 0..$tracks-1;
             } elsif( $key eq 'u' ) {
                 toggle_mute($_, '') for 0..$tracks-1;
+            } elsif( $key eq 'r' ) {
+                undef $sequencer;
+                goto &play_sounds;
             } elsif( $key eq 'q' ) {
                 $loop->stop;
             } else {

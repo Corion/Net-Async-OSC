@@ -4,6 +4,9 @@ use feature 'signatures';
 no warnings 'experimental::signatures';
 use Carp 'croak';
 
+use lib '../Term-Output-List/lib';
+use Term::Output::List;
+
 use IO::Async::Loop;
 use IO::Async::Timer::Periodic;
 use Net::Async::OSC;
@@ -15,6 +18,22 @@ my $osc = Net::Async::OSC->new(
     loop => $loop,
 );
 $osc->connect('127.0.0.1', 4560)->get;
+
+my @track_names = (qw(
+    ???
+    chord
+    hh
+    snare
+    bassdrum
+    bass
+    melody
+    777
+));
+
+my $t = Term::Output::List->new();
+sub msg($msg) {
+    $t->output_permanent($msg);
+}
 
 my $bpm    = 97;
 my $beats  = 4; # 4/4
@@ -166,7 +185,7 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
     while( length $p < 256 / $ticks_per_note) {
         $p .= $1;
     }
-        say $p;
+        msg( $p );
     my @beats = split //, $p;
     my $ofs = 0;
 
@@ -213,8 +232,8 @@ my $last = beat(16,0) -1;
 $sequencer->[$last]= undef;
 
 # Round up to a 4/4 bar
-say $last;
-say scalar @$sequencer;
+msg( $last );
+msg( scalar @$sequencer );
 my $ticks_in_bar = @$sequencer / $tracks;
 while( int( $ticks_in_bar ) != $ticks_in_bar ) {
     $ticks_in_bar = int($ticks_in_bar)+1;
@@ -226,14 +245,14 @@ while( int( $ticks_in_bar ) != $ticks_in_bar ) {
     # expand
     $sequencer->[loc($ticks_in_bar,0)-1] = undef;
 
-    say (@$sequencer / $tracks);
+    msg(@$sequencer / $tracks);
 }
 
 my $tick = 0;
 my $ticks_in_bar = @$sequencer / $tracks;
 
 die "data structure is not a complete bar ($ticks_in_bar)" if int($ticks_in_bar) != $ticks_in_bar;
-say "You have defined $ticks_in_bar ticks";
+msg( "You have defined $ticks_in_bar ticks" );
 
 $| = 1;
 
@@ -247,16 +266,18 @@ $| = 1;
 
 my $output_state = '';
 
+my @playing = ('' x (1+$tracks));
+
 sub play_sounds {
     my $loc = loc($tick, 0) % @$sequencer;
 
     if( $output_state eq 'silent' ) {
         # do nothing
     } else {
-        #print sprintf "%d / %d / %d\r", $tick, $loc, scalar @$sequencer;
         for my $s ($loc..$loc+$tracks-1) {
             my $n = $sequencer->[$s];
             if( $n ) {
+                $playing[ $s-$loc ] = $n;
                 my $r = ref $n;
                 if( $r ) {
                     if( $r eq 'CODE' ) {
@@ -267,12 +288,21 @@ sub play_sounds {
                         $osc->send_osc( @$n );
                     }
 
+                } elsif( $s == $loc ) {
+                    $playing[0] = $n;
+
                 } else {
-        #print sprintf "%d / %d / %d - $ticks_in_bar - beat\r", $tick, $loc, scalar @$sequencer;
                     $osc->send_osc_msg( $n );
                 }
+            } else {
+                $playing[ $s-$loc ] = '';
             }
         }
+
+        my @output = map {
+            sprintf "% 12s | %s", $track_names[$_], $playing[$_];
+        } 0..7;
+        $t->output_list(@output);
     }
     # Consider calculating the tick from the start of the
     # playtime instead of blindly increasing it?!

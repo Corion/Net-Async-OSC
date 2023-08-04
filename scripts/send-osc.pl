@@ -20,7 +20,7 @@ my $osc = Net::Async::OSC->new(
 $osc->connect('127.0.0.1', 4560)->get;
 
 my @track_names = (qw(
-    ???
+    <harmony>
     chord
     hh
     snare
@@ -31,6 +31,10 @@ my @track_names = (qw(
 ));
 
 my $t = Term::Output::List->new();
+my $input;
+if( $^O eq 'MSWin32') {
+    $input = Win32::Console->new(Win32::Console::STD_INPUT_HANDLE());
+}
 sub msg($msg) {
     $t->output_permanent($msg);
 }
@@ -272,41 +276,63 @@ $| = 1;
 my $output_state = '';
 
 my @playing = ('' x (1+$tracks));
+my @mute    = ('' x (1+$tracks));
 
 sub play_sounds {
     my $loc = loc($tick, 0) % @$sequencer;
+
+    # Win32 specific...
+    while( $input and $input->GetEvents ) {
+        #msg( sprintf "Pending: %d", $input->GetEvents );
+        my @ev = $input->Input();
+        if( $ev[0] == 1 and $ev[1] ) {
+            my $key = chr($ev[5]);
+            if( $key =~ /\d/ ) {
+                if( $mute[ $key ] ) {
+                    $mute[ $key ] = '';
+                } else {
+                    $mute[ $key ] = 'mute';
+                }
+            } else {
+                msg("Keypress '$key'");
+            }
+        }
+    }
 
     if( $output_state eq 'silent' ) {
         # do nothing
     } else {
         for my $s ($loc..$loc+$tracks-1) {
+            my $track = $s-$loc;
             my $n = $sequencer->[$s];
             if( $n ) {
-                $playing[ $s-$loc ] = $n;
-                my $r = ref $n;
-                if( $r ) {
-                    if( $r eq 'CODE' ) {
-                        # Can we pass any meaningful parameters here?
-                        # Like maybe the current tick?!
-                        $osc->send_osc( $n->($tick) );
-                    } elsif( $r eq 'ARRAY' ) {
-                        $osc->send_osc( @$n );
+                $playing[ $track ] = $n;
+                if( ! $mute[ $track ]) {
+                    my $r = ref $n;
+                    if( $r and not $mute[$track] ) {
+                        if( $r eq 'CODE' ) {
+                            # Can we pass any meaningful parameters here?
+                            # Like maybe the current tick?!
+                            $osc->send_osc( $n->($tick) );
+                        } elsif( $r eq 'ARRAY' ) {
+                            $osc->send_osc( @$n );
+                        }
+
+                    } elsif( $track == 0 ) {
+                        $playing[0] = $n;
+
+                    } else {
+                        $osc->send_osc_msg( $n );
                     }
-
-                } elsif( $s == $loc ) {
-                    $playing[0] = $n;
-
-                } else {
-                    $osc->send_osc_msg( $n );
                 }
             } else {
-                $playing[ $s-$loc ] = '';
+                $playing[ $track ] = '';
             }
         }
 
         my @output = map {
-            sprintf "% 12s | %s", $track_names[$_], $playing[$_];
-        } 0..7;
+            sprintf "%d| %8s | % 12s | %s", $_, $mute[$_], $track_names[$_], $playing[$_];
+        } 0..$tracks-1;
         $t->output_list(@output);
     }
     # Consider calculating the tick from the start of the

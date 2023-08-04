@@ -155,9 +155,10 @@ sub octave($note) {
     return int($note/12)-1
 }
 
-sub melody_step( $sequencer, $tick, $base, $harmonies, $curr_harmony, $next_harmony, $last_note, $chord_track ) {
+sub melody_step( $sequencer, $tick, $harmonies, $curr_harmony, $next_harmony, $last_note, $chord_track, $bass_track ) {
     my $h = $harmonies->[ $curr_harmony ];
     my $chord_name = $chord_names{ $h->[1]} // $h->[1];
+    my $base = $h->[0];
     #my $cn = Music::Chord::Note->new();
 
     # Cache this?!
@@ -177,18 +178,26 @@ sub melody_step( $sequencer, $tick, $base, $harmonies, $curr_harmony, $next_harm
         or die "Unknown harmony '$h->[1]' for chord";
     my @scale;
 
-msg($tick);
-    if( $sequencer->[beat($tick,$chord_track)]
+    my $cn = Music::Chord::Note->new();
+    my %chord = map { $base + $_ => 1 } $cn->chord_num($chord_name);
+
+    if(    $sequencer->[beat($tick,$chord_track)]
+        or $sequencer->[beat($tick,$bass_track)]
     ) {
         # Use a note in line with the currently playing chord
-        my $cn = Music::Chord::Note->new();
         @scale = map { $base + $_ } $cn->chord_num($chord_name);
     
     } else {
         # Use a random note, that is not too far from the current note
                 
         @scale = grep {     $_ != $last_note }
-                 grep { abs($_ - $last_note) < 8 }
+                 grep {  1
+                 #       and  ! exists $chord{ $_ +1 }
+                 #       and ! exists $chord{ $_ -1 }
+                        and ! exists $chord{ $_ +6 } # tritone
+                        and ! exists $chord{ $_ -6 }
+                      }
+                 grep { abs($_ - $last_note) < 7 }
                       get_scale_MIDI($base, octave($base), $scale_name, 0),
                       get_scale_MIDI($base, octave($base)-1, $scale_name, 0),
                       ;
@@ -197,7 +206,7 @@ msg($tick);
 }
 
 # Another track with a "melody" based on the harmonies above
-sub generate_melody( $base, $harmonies, $sequencer, $track, $chord_track ) {
+sub generate_melody( $base, $harmonies, $sequencer, $track, $chord_track, $bass_track ) {
     #my @melody = (split //, "--o-o---o-o-o---o-o-o---o-o-o---");
     my @melody = (split //, "o---o---");
 
@@ -211,7 +220,7 @@ sub generate_melody( $base, $harmonies, $sequencer, $track, $chord_track ) {
         my $next_harmony = ($harmony+1)%@$harmonies;
         for my $ofs (0..$#melody) {
             if( $melody[ $rhythm_ofs ] ne '-' ) {
-                my $note = melody_step( $sequencer, $ofs, $base, $harmonies, $harmony, $next_harmony, $last_note, $chord_track );
+                my $note = melody_step( $sequencer, $ofs, $harmonies, $harmony, $next_harmony, $last_note, $chord_track, $bass_track );
                 $sequencer->[beat($beat*8+$ofs,$track)] = [
                     "/trigger/melody" => 'i', ($note)
                 ];
@@ -276,7 +285,7 @@ sub fresh_pattern($base, $harmonies) {
 
     generate_bassline($sequencer, $harmonies, "o-------o---------------o---o---", $chord_track, $info_track);
     generate_one_drop($sequencer, scalar @$harmonies);
-    generate_melody( $base, $harmonies, $sequencer, 6, $chord_track );
+    generate_melody( $base, $harmonies, $sequencer, 6, $chord_track,5 );
 
     # "Expand" the array to the full length
     # This should simply be the next multiple of $beats*$ticks*$tracks, no?!
@@ -308,8 +317,6 @@ sub fresh_pattern($base, $harmonies) {
 
     return $sequencer, $ticks_in_bar;
 }
-
-#my ($sequencer, $ticks_in_bar) = fresh_pattern(\@harmonies);
 
 $| = 1;
 
@@ -368,6 +375,11 @@ sub play_sounds {
             } elsif( $key eq 'r' ) {
                 undef $sequencer;
                 goto &play_sounds;
+
+            } elsif( $key eq 'x' ) {
+                dump_state();
+                $loop->stop;
+
             } elsif( $key eq 'q' ) {
                 $loop->stop;
             } else {
@@ -400,6 +412,7 @@ sub play_sounds {
                         $playing[0] = $n;
 
                     } else {
+                        #msg("$n");
                         $osc->send_osc_msg( $n );
                     }
                 }

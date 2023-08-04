@@ -182,15 +182,17 @@ sub generate_melody( $harmonies, $sequencer, $track ) {
 }
 
 # we expect each char to be a 32th note (?!)
-sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks_per_note=undef) {
+# We need to repeat the pattern until it fills the longest other pattern!
+sub parse_drum_pattern( $sequencer, $total_bars, $track, $pattern, $osc_message,$vol=1,$ticks_per_note=undef) {
     $pattern =~ m!^\s*\w+\s*\|((?:[\w\-]{16})+)\|+!
         or croak "Invalid pattern '$pattern'";
     $ticks_per_note //= length($1) / 4;
     my $p = $1;
-    while( length $p < 256 / $ticks_per_note) {
+    my $target_len = $total_bars*$beats*$ticks*2 / $ticks_per_note; # the 2 is because each total_bar is 2 bars
+    while( length $p < $target_len) {
         $p .= $1;
     }
-        msg( $p );
+    msg( $p );
     my @beats = split //, $p;
     my $ofs = 0;
 
@@ -204,31 +206,29 @@ sub parse_drum_pattern( $sequencer, $track, $pattern, $osc_message,$vol=1,$ticks
         }
         $ofs++;
     }
-    #print "\r". loc(($ofs-1)*$ticks_per_note,$track);
-    #print "\n";
 }
 
 # Half Drop
-sub generate_half_drop( $sequencer ) {
-    parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh');
-    parse_drum_pattern($sequencer, 3, ' S|--------o-------||', '/trigger/sn');
-    parse_drum_pattern($sequencer, 4, ' B|o-------o-------||', '/trigger/bd');
+sub generate_half_drop( $sequencer, $total_bars ) {
+    parse_drum_pattern($sequencer, $total_bars, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh');
+    parse_drum_pattern($sequencer, $total_bars, 3, ' S|--------o-------||', '/trigger/sn');
+    parse_drum_pattern($sequencer, $total_bars, 4, ' B|o-------o-------||', '/trigger/bd');
 }
 
 # One Drop
-sub generate_one_drop( $sequencer ) {
-    parse_drum_pattern($sequencer, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh',1,4);
-    parse_drum_pattern($sequencer, 3, ' S|--------o-------||', '/trigger/sn',1,4);
-    parse_drum_pattern($sequencer, 4, ' B|--------o-------||', '/trigger/bd',1,4);
+sub generate_one_drop( $sequencer, $total_bars ) {
+    parse_drum_pattern($sequencer, $total_bars, 2, 'HH|x-x-x-x-x-x-x-x-||', '/trigger/hh',1,4);
+    parse_drum_pattern($sequencer, $total_bars, 3, ' S|--------o-------||', '/trigger/sn',1,4);
+    parse_drum_pattern($sequencer, $total_bars, 4, ' B|--------o-------||', '/trigger/bd',1,4);
 }
 
 # Reggaeton
-sub generate_reggaeton( $sequencer ) {
-    parse_drum_pattern($sequencer, 2, 'HH|x---x---x---x---x---x---x---x---||', '/trigger/hh',0.25,2);
-    parse_drum_pattern($sequencer, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
-    parse_drum_pattern($sequencer, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
+sub generate_reggaeton( $sequencer, $total_bars ) {
+    parse_drum_pattern($sequencer, $total_bars, 2, 'HH|x---x---x---x---x---x---x---x---||', '/trigger/hh',0.25,2);
+    parse_drum_pattern($sequencer, $total_bars, 3, ' B|o-------o-------o-------o-------||', '/trigger/bd',1,2);
+    parse_drum_pattern($sequencer, $total_bars, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 }
-generate_one_drop($sequencer);
+generate_one_drop($sequencer, scalar @harmonies);
 generate_melody( \@harmonies, $sequencer, 6 );
 
 # "Expand" the array to the full length

@@ -68,7 +68,8 @@ sub random_melody( $sequencer, $track ) {
 }
 
 sub wailers($base) {
-        my @harmonies = ([$base,  'major'], #C
+        my @harmonies = (
+                    [$base,  'major'], #C
                     [$base,  'major'],
                     #[$base,  'M7'],
                     [$base+7,'major'], #G
@@ -186,10 +187,10 @@ sub melody_step( $sequencer, $tick, $harmonies, $curr_harmony, $next_harmony, $l
     ) {
         # Use a note in line with the currently playing chord
         @scale = map { $base + $_ } $cn->chord_num($chord_name);
-    
+
     } else {
         # Use a random note, that is not too far from the current note
-                
+
         @scale = grep {     $_ != $last_note }
                  grep {  1
                  #       and  ! exists $chord{ $_ +1 }
@@ -222,7 +223,7 @@ sub generate_melody( $base, $harmonies, $sequencer, $track, $chord_track, $bass_
             if( $melody[ $rhythm_ofs ] ne '-' ) {
                 my $note = melody_step( $sequencer, $ofs, $harmonies, $harmony, $next_harmony, $last_note, $chord_track, $bass_track );
                 $sequencer->[beat($beat*8+$ofs,$track)] = [
-                    "/trigger/melody" => 'i', ($note)
+                    "/trigger/melody" => 'ii', ($note,1) # legato
                 ];
                 $last_note = $note;
             };
@@ -291,27 +292,27 @@ sub fresh_pattern($base, $harmonies) {
     # This should simply be the next multiple of $beats*$ticks*$tracks, no?!
     my $last = beat(16,0) -1;
     $sequencer->[$last]= undef;
-    
+
     # Round up to a 4/4 bar
     msg( $last );
     msg( scalar @$sequencer );
     my $ticks_in_bar = @$sequencer / $tracks;
     while( int( $ticks_in_bar ) != $ticks_in_bar ) {
         $ticks_in_bar = int($ticks_in_bar)+1;
-    
+
         while( $ticks_in_bar % 16 != 0 ) {
             $ticks_in_bar += (16 - ($ticks_in_bar % 16));
         }
-    
+
         # expand
         $sequencer->[loc($ticks_in_bar,0)-1] = undef;
-    
+
         msg(@$sequencer / $tracks);
     }
-    
+
     my $tick = 0;
     my $ticks_in_bar = @$sequencer / $tracks;
-    
+
     die "data structure is not a complete bar ($ticks_in_bar)" if int($ticks_in_bar) != $ticks_in_bar;
     msg( "You have defined $ticks_in_bar ticks" );
 
@@ -351,13 +352,13 @@ sub play_sounds {
     state $tick;
     state $sequencer;
     state $ticks_in_bar;
-    
+
     if( ! $sequencer ) {
         my $harmonies = get_harmonies();
         my $base = int( 60+rand 24 );
         ($sequencer, $ticks_in_bar) = fresh_pattern($base, $harmonies);
     }
-    
+
     my $loc = loc($tick, 0) % @$sequencer;
 
     # Win32 specific...
@@ -381,7 +382,15 @@ sub play_sounds {
                 $loop->stop;
 
             } elsif( $key eq 'q' ) {
-                $loop->stop;
+                warn "Sending music stop";
+                $mute[6] = 1;
+                $osc->send_osc(
+                    "/trigger/melody" => 'ii',
+                    1,0);
+                $loop->watch_time( after => 1,
+                code => sub {
+                    $loop->stop;
+                });
             } else {
                 msg("Keypress '$key' ($ev[5])")
                     if $ev[5];

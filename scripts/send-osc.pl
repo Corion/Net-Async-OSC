@@ -371,19 +371,7 @@ sub toggle_mute($track, $mute=undef) {
     $mute[ $track ] = $val;
 }
 
-sub play_sounds {
-    state $tick;
-    state $sequencer;
-    state $ticks_in_bar;
-
-    if( ! $sequencer ) {
-        my $harmonies = get_harmonies();
-        my $base = int( 60+rand 24 );
-        ($sequencer, $ticks_in_bar) = fresh_pattern($base, $harmonies);
-    }
-
-    my $loc = loc($tick, 0) % @$sequencer;
-
+sub handle_keyboard {
     # Win32 specific...
     while( $input and $input->GetEvents ) {
         #msg( sprintf "Pending: %d", $input->GetEvents );
@@ -397,8 +385,7 @@ sub play_sounds {
             } elsif( $key eq 'u' ) {
                 toggle_mute($_, '') for 0..$tracks-1;
             } elsif( $key eq 'r' ) {
-                undef $sequencer;
-                goto &play_sounds;
+                return undef;
 
             } elsif( $key eq 'x' ) {
                 dump_state();
@@ -419,6 +406,25 @@ sub play_sounds {
                     if $ev[5];
             }
         }
+    }
+    return 1;
+}
+
+sub play_sounds {
+    state $tick;
+    state $sequencer;
+    state $ticks_in_bar;
+
+    if( ! $sequencer ) {
+        my $harmonies = get_harmonies();
+        my $base = int( 60+rand 24 );
+        ($sequencer, $ticks_in_bar) = fresh_pattern($base, $harmonies);
+    }
+
+    my $loc = loc($tick, 0) % @$sequencer;
+    if( ! handle_keyboard()) {
+        undef $sequencer;
+        goto &play_sounds;
     }
 
     if( $output_state eq 'silent' ) {

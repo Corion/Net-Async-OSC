@@ -3,6 +3,7 @@ use 5.020;
 use feature 'signatures';
 no warnings 'experimental::signatures';
 use Carp 'croak';
+use Getopt::Long;
 
 use Term::Output::List;
 
@@ -12,6 +13,18 @@ use Net::Async::OSC;
 use Music::VoiceGen;
 use Music::Scales;
 use Music::Chord::Note;
+
+GetOptions(
+    'mute=s' => \my @do_mute,
+    'seed=s' => \my $seed,
+) or pod2usage(2);
+
+@do_mute = map { split /,/ } @do_mute;
+
+if( $seed ) {
+    srand($seed);
+}
+
 my $loop = IO::Async::Loop->new();
 my $osc = Net::Async::OSC->new(
     loop => $loop,
@@ -332,6 +345,17 @@ my $output_state = '';
 
 my @playing = ('' x (1+$tracks));
 my @mute    = ('' x (1+$tracks));
+
+for my $m (@do_mute) {
+    my $i;
+    for (0..$#track_names) {
+        if( $m eq $track_names[$_] ) {
+            $i = $_;
+            last;
+        }
+    };
+    $mute[ $i ] = 1;
+}
 
 sub toggle_mute($track, $mute=undef) {
     my $val = $mute;

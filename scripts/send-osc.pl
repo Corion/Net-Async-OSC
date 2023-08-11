@@ -4,7 +4,6 @@ use feature 'signatures';
 no warnings 'experimental::signatures';
 use Carp 'croak';
 
-use lib '../Term-Output-List/lib';
 use Term::Output::List;
 
 use IO::Async::Loop;

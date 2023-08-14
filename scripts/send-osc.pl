@@ -293,6 +293,14 @@ sub generate_reggaeton( $sequencer, $total_bars ) {
     parse_drum_pattern($sequencer, $total_bars, 4, ' S|----------------------o-----o---||', '/trigger/sn',1,2);
 }
 
+sub generate_lyrics($sequencer, $track) {
+    my $p = beat(0,7);
+    while( $p < @$sequencer ) {
+        $sequencer->[$p] = \&sing;
+        $p += beat(16,0); # XXX fix the 16 to $beats*4 ?!
+    }
+}
+
 sub fresh_pattern($base, $harmonies) {
     my $sequencer = [];
     my $harmonies = get_harmonies();
@@ -300,6 +308,10 @@ sub fresh_pattern($base, $harmonies) {
     generate_bassline($sequencer, $harmonies, "o-------o---------------o---o---", $chord_track, $info_track);
     generate_one_drop($sequencer, scalar @$harmonies);
     generate_melody( $base, $harmonies, $sequencer, 6, $chord_track,5 );
+
+    if( $voice ) {
+        generate_lyrics($sequencer, 7);
+    }
 
     # "Expand" the array to the full length
     # This should simply be the next multiple of $beats*$ticks*$tracks, no?!
@@ -321,14 +333,6 @@ sub fresh_pattern($base, $harmonies) {
         $sequencer->[loc($ticks_in_bar,0)-1] = undef;
 
         msg(@$sequencer / $tracks);
-    }
-
-    if( $voice ) {
-        my $p = beat(0,7);
-        while( $p < @$sequencer ) {
-            $sequencer->[$p] = \&sing;
-            $p += beat(16,0);
-        }
     }
 
     my $tick = 0;
@@ -367,7 +371,7 @@ sub sing($ofs) {
     }
     my $l = $lyrics[$line++];
     #if( $l !~ /></ ) {
-        msg("Singing $l");
+        #msg("Singing $l");
         $sapi->Speak($l, 1);
     #}
     return (); # we don't want to generate sound with OSC

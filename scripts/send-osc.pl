@@ -324,8 +324,10 @@ sub fresh_pattern($base, $harmonies) {
     }
 
     if( $voice ) {
-        for my $p (beat(0,7)) {
+        my $p = beat(0,7);
+        while( $p < @$sequencer ) {
             $sequencer->[$p] = \&sing;
+            $p += beat(16,0);
         }
     }
 
@@ -345,7 +347,7 @@ my @lyrics = map { qq{<LANG LANGID="9">$_</LANG>} } (
 '','','','',
 
 "We're no strangers to love",
-"You know the rules and so do I (Do I)",
+"You know the rules and so do I",
 "A full commitment's what I'm thinking of",
 "You wouldn't get this from any other guy",
 
@@ -363,9 +365,12 @@ sub sing($ofs) {
     if( $line >= @lyrics ) {
         $line = 0;
     }
-    msg("Singing $line");
-    $sapi->Speak($lyrics[$line++], 1);
-    return ()
+    my $l = $lyrics[$line++];
+    #if( $l !~ /></ ) {
+        msg("Singing $l");
+        $sapi->Speak($l, 1);
+    #}
+    return (); # we don't want to generate sound with OSC
 }
 
 $| = 1;
@@ -507,6 +512,9 @@ sub play_sounds {
     # Consider calculating the tick from the start of the
     # playtime instead of blindly increasing it?!
     $tick = ($tick+1)%$ticks_in_bar;
+    if( $tick == 0 ) {
+        msg("Restarting from 0");
+    }
 }
 
 my $timer = IO::Async::Timer::Periodic->new(

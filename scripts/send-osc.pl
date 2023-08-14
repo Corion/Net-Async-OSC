@@ -17,6 +17,7 @@ use Music::Chord::Note;
 GetOptions(
     'mute=s' => \my @do_mute,
     'seed=s' => \my $seed,
+    'voice'  => \my $voice,
 ) or pod2usage(2);
 
 @do_mute = map { split /,/ } @do_mute;
@@ -322,6 +323,12 @@ sub fresh_pattern($base, $harmonies) {
         msg(@$sequencer / $tracks);
     }
 
+    if( $voice ) {
+        for my $p (beat(0,7)) {
+            $sequencer->[$p] = \&sing;
+        }
+    }
+
     my $tick = 0;
     my $ticks_in_bar = @$sequencer / $tracks;
 
@@ -329,6 +336,36 @@ sub fresh_pattern($base, $harmonies) {
     msg( "You have defined $ticks_in_bar ticks" );
 
     return $sequencer, $ticks_in_bar;
+}
+
+use Win32::OLE;
+my $sapi = Win32::OLE->CreateObject('SAPI.SpVoice');
+
+my @lyrics = map { qq{<LANG LANGID="9">$_</LANG>} } (
+'','','','',
+
+"We're no strangers to love",
+"You know the rules and so do I (Do I)",
+"A full commitment's what I'm thinking of",
+"You wouldn't get this from any other guy",
+
+"I just wanna tell you how I'm feeling",
+"Gotta make you understand",
+"Never gonna give you up",
+"Never gonna let you down",
+"Never gonna run around and desert you",
+"Never gonna make you cry",
+"Never gonna say goodbye",
+"Never gonna tell a lie and hurt you",
+);
+sub sing($ofs) {
+    state $line = 0;
+    if( $line >= @lyrics ) {
+        $line = 0;
+    }
+    msg("Singing $line");
+    $sapi->Speak($lyrics[$line++], 1);
+    return ()
 }
 
 $| = 1;
@@ -441,7 +478,10 @@ sub play_sounds {
                         if( $r eq 'CODE' ) {
                             # Can we pass any meaningful parameters here?
                             # Like maybe the current tick?!
-                            $osc->send_osc( $n->($tick) );
+                            my @res = $n->($tick);
+                            if( @res ) {
+                                $osc->send_osc( @res );
+                            }
                         } elsif( $r eq 'ARRAY' ) {
                             $osc->send_osc( @$n );
                         }
@@ -486,6 +526,7 @@ $loop->run;
 __END__
 
 [ ] Have multiple progressions, and switch between those
+    [ ] intro, lyrics, chorus, outro, bridge
 [ ] Patterns can then become expand_pattern("AABA"), which calls expand_progression()
 [ ] Songs are patterns like "IIAABBAABBCCBBCxAABBAABBAABBCCBBCCBBCCBBCCBBOO"
     where "II" are intro patterns (without melody)

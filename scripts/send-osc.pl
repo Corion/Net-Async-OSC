@@ -264,7 +264,7 @@ sub parse_drum_pattern( $sequencer, $total_bars, $track, $pattern, $osc_message,
     while( length $p < $target_len) {
         $p .= $1;
     }
-    msg( $p );
+    #msg( $p );
     my @beats = split //, $p;
     my $ofs = 0;
 
@@ -327,8 +327,8 @@ sub fresh_pattern($base, $harmonies) {
     $sequencer->[$last]= undef;
 
     # Round up to a 4/4 bar
-    msg( $last );
-    msg( scalar @$sequencer );
+    #msg( $last );
+    #msg( scalar @$sequencer );
     my $ticks_in_bar = @$sequencer / $tracks;
     while( int( $ticks_in_bar ) != $ticks_in_bar ) {
         $ticks_in_bar = int($ticks_in_bar)+1;
@@ -340,14 +340,14 @@ sub fresh_pattern($base, $harmonies) {
         # expand
         $sequencer->[loc($ticks_in_bar,0)-1] = undef;
 
-        msg(@$sequencer / $tracks);
+        #msg(@$sequencer / $tracks);
     }
 
     my $tick = 0;
     $ticks_in_bar = @$sequencer / $tracks;
 
     die "data structure is not a complete bar ($ticks_in_bar)" if int($ticks_in_bar) != $ticks_in_bar;
-    msg( "You have defined $ticks_in_bar ticks" );
+    #msg( "You have defined $ticks_in_bar ticks" );
 
     return $sequencer, $ticks_in_bar;
 }

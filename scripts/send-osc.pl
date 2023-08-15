@@ -309,15 +309,18 @@ sub generate_lyrics($sequencer, $track) {
     }
 }
 
-sub fresh_pattern($base, $harmonies) {
+sub fresh_pattern($base, $harmonies, %options) {
     my $sequencer = [];
     my $harmonies = get_harmonies();
 
-    generate_bassline($sequencer, $harmonies, "o-------o---------------o---o---", $chord_track, $info_track);
+    $options{ bassline } //= "o-------o---------------o---o---";
+
+    generate_bassline($sequencer, $harmonies, $options{bassline}, $chord_track, $info_track);
     generate_one_drop($sequencer, scalar @$harmonies);
+
     generate_melody( $base, $harmonies, $sequencer, 6, $chord_track,5 );
 
-    if( $voice ) {
+    if( $options{ voice }) {
         generate_lyrics($sequencer, 7);
     }
 

@@ -347,7 +347,7 @@ sub fresh_pattern($base, $harmonies) {
 use Win32::OLE;
 my $sapi = Win32::OLE->CreateObject('SAPI.SpVoice');
 
-my @lyrics = map { qq{<LANG LANGID="9">$_</LANG>} } (
+my @lyrics = map { qq{<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='EN'>$_</speak>} } (
 '','','','',
 
 "We're no strangers to love",

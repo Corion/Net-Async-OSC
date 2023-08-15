@@ -119,11 +119,11 @@ sub get_harmonies( $base = 50 + int(rand(32)) ) {
     # Maybe we want markov-style progressions, or some other weirdo set?
     my $base = 50 + int(rand(32));
 
-    if( rand(1) >= 0.5 ) {
-        return tosh($base)
-    } else {
+    #if( rand(1) >= 0.5 ) {
+    #    return tosh($base)
+    #} else {
         return wailers($base)
-    }
+    #}
 }
 
 my $chord_track = 1;
@@ -456,20 +456,55 @@ sub handle_keyboard {
     return 1;
 }
 
+sub generate_song {
+    my @phrases;
+
+    my $harmonies = get_harmonies();
+    my $base = int( 60+rand 24 );
+
+    # Intro
+    # Verse
+    my($seq,$ticks_in_bar) = fresh_pattern($base, $harmonies);
+    my $verse = {
+        sequencer => $seq,
+        ticks     => $ticks_in_bar,
+        name      => 'Verse',
+    };
+    # Chorus
+    ($seq,$ticks_in_bar) = fresh_pattern($base, $harmonies);
+    my $chorus = {
+        sequencer => $seq,
+        ticks     => $ticks_in_bar,
+        name      => 'Chorus',
+    };
+
+    push @phrases, $verse, $chorus, $verse, $chorus, $chorus;
+
+    return \@phrases
+}
+
 sub play_sounds {
     state $tick;
     state $sequencer;
     state $ticks_in_bar;
+    state $song;
+    state $song_pos;
+    state $playing;
 
-    if( ! $sequencer ) {
-        my $harmonies = get_harmonies();
-        my $base = int( 60+rand 24 );
-        ($sequencer, $ticks_in_bar) = fresh_pattern($base, $harmonies);
+    if( ! $song ) {
+        $song = generate_song();
+        $song_pos = 0;
+        undef $playing;
+    };
+
+    if( ! $playing ) {
+        $playing = $song->[$song_pos];
+        ($sequencer, $ticks_in_bar) = ($playing->{sequencer}, $playing->{ticks});
     }
 
     my $loc = loc($tick, 0) % @$sequencer;
     if( ! handle_keyboard()) {
-        undef $sequencer;
+        undef $song;
         goto &play_sounds;
     }
 
@@ -516,8 +551,14 @@ sub play_sounds {
     # Consider calculating the tick from the start of the
     # playtime instead of blindly increasing it?!
     $tick = ($tick+1)%$ticks_in_bar;
+
     if( $tick == 0 ) {
-        msg("Restarting from 0");
+        msg("Moving to next phrase");
+        # move to the next part of the song
+        $song_pos = ($song_pos+1) % @$song;
+        undef $playing;
+
+        # Should we wrap to the intro, or after it?!
     }
 }
 

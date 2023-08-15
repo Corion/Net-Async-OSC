@@ -510,6 +510,7 @@ sub play_sounds {
     if( ! $playing ) {
         $playing = $song->[$song_pos];
         ($sequencer, $ticks_in_bar) = ($playing->{sequencer}, $playing->{ticks});
+        msg("Playing $playing->{name}");
     }
 
     my $loc = loc($tick, 0) % @$sequencer;
@@ -567,7 +568,6 @@ sub play_sounds {
     $tick = ($tick+1)%$ticks_in_bar;
 
     if( $tick == 0 ) {
-        msg("Moving to next phrase");
         # move to the next part of the song
         $song_pos = ($song_pos+1) % @$song;
         undef $playing;

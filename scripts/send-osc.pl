@@ -336,7 +336,7 @@ sub fresh_pattern($base, $harmonies) {
     }
 
     my $tick = 0;
-    my $ticks_in_bar = @$sequencer / $tracks;
+    $ticks_in_bar = @$sequencer / $tracks;
 
     die "data structure is not a complete bar ($ticks_in_bar)" if int($ticks_in_bar) != $ticks_in_bar;
     msg( "You have defined $ticks_in_bar ticks" );

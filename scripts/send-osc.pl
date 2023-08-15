@@ -18,7 +18,12 @@ GetOptions(
     'mute=s' => \my @do_mute,
     'seed=s' => \my $seed,
     'voice'  => \my $voice,
+    'dry-run|n'  => \my $dry_run,
 ) or pod2usage(2);
+
+if( $dry_run ) {
+    undef $voice;
+}
 
 @do_mute = map { split /,/ } @do_mute;
 
@@ -30,7 +35,10 @@ my $loop = IO::Async::Loop->new();
 my $osc = Net::Async::OSC->new(
     loop => $loop,
 );
-$osc->connect('127.0.0.1', 4560)->get;
+
+if( ! $dry_run ) {
+    $osc->connect('127.0.0.1', 4560)->get;
+}
 
 my @track_names = (qw(
     <harmony>
@@ -438,11 +446,13 @@ sub handle_keyboard {
                 $loop->stop;
 
             } elsif( $key eq 'q' ) {
-                warn "Sending music stop";
+                #warn "Sending music stop";
                 $mute[6] = 1;
-                $osc->send_osc(
-                    "/trigger/melody" => 'ii',
-                    1,0);
+                if( ! $dry_run ) {
+                    $osc->send_osc(
+                        "/trigger/melody" => 'ii',
+                        1,0);
+                }
                 $loop->watch_time( after => 1,
                 code => sub {
                     $loop->stop;
@@ -519,23 +529,27 @@ sub play_sounds {
                 if( ! $mute[ $track ]) {
                     my $r = ref $n;
                     if( $r and not $mute[$track] ) {
+                        my @osc_msg;
+
                         if( $r eq 'CODE' ) {
                             # Can we pass any meaningful parameters here?
                             # Like maybe the current tick?!
-                            my @res = $n->($tick);
-                            if( @res ) {
-                                $osc->send_osc( @res );
-                            }
+                            @osc_msg = $n->($tick);
                         } elsif( $r eq 'ARRAY' ) {
-                            $osc->send_osc( @$n );
+                            @osc_msg = @$n;
+                        }
+
+                        if( @osc_msg and ! $dry_run ) {
+                            $osc->send_osc( @osc_msg );
                         }
 
                     } elsif( $track == 0 ) {
                         $playing[0] = $n;
 
                     } else {
-                        #msg("$n");
-                        $osc->send_osc_msg( $n );
+                        if( !$dry_run ) {
+                            $osc->send_osc_msg( $n );
+                        }
                     }
                 }
             } else {

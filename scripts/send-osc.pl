@@ -60,7 +60,7 @@ sub msg($msg) {
     $t->output_permanent($msg);
 }
 
-my $bpm    = 97;
+my $bpm    = 100;
 my $beats  = 4; # 4/4
 my $ticks  = 4; # ticks per beat, means 1/16th notes
 my $tracks = 8; # so far...
@@ -253,6 +253,32 @@ sub generate_melody( $base, $harmonies, $sequencer, $track, $chord_track, $bass_
     }
 }
 
+sub generate_intro( $base, $harmonies, $sequencer, $track ) {
+    # Clean out all the melody, add FX into it
+
+    my $harmony = -1;
+
+    # Kill off the melody
+    for my $ofs (0..(@$sequencer / $tracks)) {
+        my $l = loc($ofs, $track);
+        undef $sequencer->[loc($ofs, $track)];
+    }
+
+    my $rhythm_ofs = 0;
+    my $last_note = $base;
+    for my $beat (0..$#$harmonies) {
+        # Select the next harmony
+        $harmony = ($harmony+1)%@$harmonies;
+        my $next_harmony = ($harmony+1)%@$harmonies;
+        for my $ofs (int rand($beats)) {
+            my $note = int rand(8)+1; # 1..8
+            $sequencer->[loc($ofs,$track)] = [
+                "/trigger/fx" => 'i', ($note)
+            ];
+        }
+    }
+}
+
 # we expect each char to be a 32th note (?!)
 # We need to repeat the pattern until it fills the longest other pattern!
 sub parse_drum_pattern( $sequencer, $total_bars, $track, $pattern, $osc_message,$vol=1,$ticks_per_note=undef) {
@@ -359,21 +385,46 @@ use Win32::OLE;
 my $sapi = Win32::OLE->CreateObject('SAPI.SpVoice');
 
 my @lyrics = map { qq{<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='EN'>$_</speak>} } (
-'','','','',
+# Intro-ish
+'','','','','','','','',
 
 "We're no strangers to love",
+'',
 "You know the rules and so do I",
+'',
 "A full commitment's what I'm thinking of",
 "You wouldn't get this from any other guy",
 
+# pre-chorus
 "I just wanna tell you how I'm feeling",
 "Gotta make you understand",
+
+# Chorus
 "Never gonna give you up",
 "Never gonna let you down",
 "Never gonna run around and desert you",
+'',
 "Never gonna make you cry",
 "Never gonna say goodbye",
 "Never gonna tell a lie and hurt you",
+'',
+"Thank you everybody",
+'',
+"You are a wonderful audience",
+'',
+"It's been a pleasure to sing for you today",
+'',
+"Also, a round of applause for the band!",
+'',
+# Chorus
+"Never gonna give you up",
+"Never gonna let you down",
+"Never gonna run around and desert you",
+'',
+"Never gonna make you cry",
+"Never gonna say goodbye",
+"Never gonna tell a lie and hurt you",
+'',
 );
 sub sing($ofs) {
     state $line = 0;
@@ -475,23 +526,36 @@ sub generate_song {
     my $harmonies = get_harmonies();
     my $base = int( 60+rand 24 );
 
-    # Intro
     # Verse
-    my($seq,$ticks_in_bar) = fresh_pattern($base, $harmonies);
+    my ($seq,$ticks_in_bar) = fresh_pattern($base, $harmonies, voice => $voice);
     my $verse = {
         sequencer => $seq,
         ticks     => $ticks_in_bar,
         name      => 'Verse',
     };
+
+    # Copy first half of verse into Intro
+    my($seq_intro) = [@$seq];
+    my @harmonies_i = @{$harmonies}[0..1];
+    splice @$seq_intro, $tracks*$ticks_in_bar / 2; # Leave only two bars
+    # Now, zero out the melody and put in some fx
+    generate_intro( $base, \@harmonies_i, $seq_intro, 6 );
+    #use Data::Dumper; warn Dumper $seq_intro; exit;
+    my $intro = {
+        sequencer => $seq_intro,
+        ticks     => $ticks_in_bar,
+        name      => 'Intro',
+    };
+
     # Chorus
-    ($seq,$ticks_in_bar) = fresh_pattern($base, $harmonies);
+    ($seq,$ticks_in_bar) = fresh_pattern($base, $harmonies, voice => $voice);
     my $chorus = {
         sequencer => $seq,
         ticks     => $ticks_in_bar,
         name      => 'Chorus',
     };
 
-    push @phrases, $verse, $chorus, $verse, $chorus, $chorus;
+    push @phrases, $intro, $verse, $chorus, $verse, $chorus, $chorus;
 
     return \@phrases
 }
@@ -595,7 +659,7 @@ $loop->run;
 
 __END__
 
-[ ] Have multiple progressions, and switch between those
+[x] Have multiple progressions, and switch between those
     [ ] intro, lyrics, chorus, outro, bridge
 [ ] Patterns can then become expand_pattern("AABA"), which calls expand_progression()
 [ ] Songs are patterns like "IIAABBAABBCCBBCxAABBAABBAABBCCBBCCBBCCBBCCBBOO"

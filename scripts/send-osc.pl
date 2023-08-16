@@ -60,7 +60,7 @@ sub msg($msg) {
     $t->output_permanent($msg);
 }
 
-my $bpm    = 100;
+my $bpm    = 94;
 my $beats  = 4; # 4/4
 my $ticks  = 4; # ticks per beat, means 1/16th notes
 my $tracks = 8; # so far...
@@ -433,8 +433,11 @@ sub sing($ofs) {
     }
     my $l = $lyrics[$line++];
     #if( $l !~ /></ ) {
-        #msg("Singing $l");
         $sapi->Speak($l, 1);
+        $l =~ s!<.*?>!!g;
+        if( $l ) {
+            msg($l);
+        }
     #}
     return (); # we don't want to generate sound with OSC
 }

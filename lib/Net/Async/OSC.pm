@@ -44,6 +44,16 @@ has 'socket' => (
     is => 'rw',
 );
 
+=head1 METHODS
+
+=head2 C<< ->connect >>
+
+  $osc->connect('127.0.0.1', 4560)->get;
+
+Connect to host/port.
+
+=cut
+
 sub connect( $self, $host, $port ) {
     my $loop = $self->loop;
     my $pingback = IO::Async::Socket->new(
@@ -62,12 +72,35 @@ sub connect( $self, $host, $port ) {
 	});
 }
 
+=head2 C<< ->send_osc >>
+
+    $osc->send_osc(
+        "/trigger/melody" => 'ii',
+        1,0);
+
+Sends an OSC message as a list. The list will be packed according to
+L<OSC::Protocol>.
+
+=cut
+
 sub send_osc( $self, @message ) {
 	my $osc = $self->osc;
 	my $socket = $self->socket;
     my $data = $osc->message(@message); # pack
     $self->send_osc_msg( $data );
 }
+
+=head2 C<< ->send_osc_msg >>
+
+    my $msg = $protocol->message(
+        "/trigger/melody" => 'ii',
+        1,0
+    );
+    $osc->send_osc_msg($msg);
+
+Sends an pre-packed OSC message.
+
+=cut
 
 sub send_osc_msg( $self, $data ) {
     #say join " , " , @{ $osc->parse( $data ) };

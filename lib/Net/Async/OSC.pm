@@ -7,6 +7,24 @@ use Carp 'croak';
 
 our $VERSION = '0.01';
 
+=head1 NAME
+
+Net::Async::OSC - send/receive OSC asynchronously
+
+=head1 SYNOPSIS
+
+  my $loop = IO::Async::Loop->new();
+  my $osc = Net::Async::OSC->new(
+      loop => $loop,
+  );
+
+  $osc->connect('127.0.0.1', 4560)->get;
+  $osc->send_osc(
+      "/trigger/melody" => 'ii',
+      1,0);
+
+=cut
+
 use Protocol::OSC;
 use IO::Async::Loop;
 use IO::Async::Socket;
@@ -57,3 +75,9 @@ sub send_osc_msg( $self, $data ) {
 }
 
 1;
+
+=head1 SEE ALSO
+
+L<Protocol::OSC>
+
+=cut
